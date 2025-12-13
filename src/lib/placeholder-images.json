@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "login-bg",
+      "description": "Abstract ink wash painting for login background",
+      "imageUrl": "https://images.unsplash.com/photo-1645179138514-427655060345?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxjYWxsaWdyYXBoeSUyMGlua3xlbnwwfHx8fDE3NjU2MzY0OTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "calligraphy ink"
+    }
+  ]
 }
