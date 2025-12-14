@@ -441,7 +441,7 @@ export default function MonthlySchedulerPage() {
       {/* Zone B: Date Buckets */}
       <div className="flex-grow pb-4 overflow-y-auto">
           <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-          <div className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
               {activeDates.map(date => {
                 const dateSlots = allSlots.filter(s => s.date === date);
                 const studentIdsOnDate = new Set(dateSlots.flatMap(s => s.assignedStudentIds));
@@ -505,3 +505,5 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
+
+    
