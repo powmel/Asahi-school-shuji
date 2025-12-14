@@ -421,7 +421,7 @@ export default function MonthlySchedulerPage() {
 
       <div className="flex-1 grid md:grid-cols-3 gap-4 overflow-hidden">
         {/* Zone A: Student Pool */}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
             <ScrollArea className="flex-1 pr-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -438,9 +438,9 @@ export default function MonthlySchedulerPage() {
         </div>
 
         {/* Zone B: Date Buckets */}
-        <div className="md:col-span-2 flex flex-col">
+        <div className="md:col-span-2 flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-            <ScrollArea className='flex-1' hideScrollbar>
+            <ScrollArea className='flex-1'>
                 <div className="grid md:grid-cols-2 gap-4 pb-4">
                     {activeDates.map(date => {
                         const dateSlots = allSlots.filter(s => s.date === date);
@@ -507,5 +507,3 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
-
-    
