@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
   loading: boolean;
-  login: (uid: string) => void;
+  login: (uid: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,12 +35,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const login = useCallback((uid: string) => {
-    const userData = { uid: uid, email: uid };
-    setLoading(true); // Prevent UI flicker during redirect
-    setUser(userData);
-    Cookies.set('user', JSON.stringify(userData), { expires: 7 });
-    // setLoading will be false on the new page load's useEffect
+  const login = useCallback(async (uid: string) => {
+    return new Promise<void>((resolve) => {
+      const userData = { uid: uid, email: uid };
+      setUser(userData);
+      Cookies.set('user', JSON.stringify(userData), { expires: 7 });
+      setLoading(false);
+      resolve();
+    });
   }, []);
 
   const logout = useCallback(() => {

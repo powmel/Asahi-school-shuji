@@ -22,16 +22,16 @@ export default function LoginPage() {
 
   const bgImage = PlaceHolderImages.find(img => img.id === 'login-bg');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock authentication
-    setTimeout(() => {
+    try {
       if ((email === 'admin@example.com' || email.startsWith('student')) && password === 'Shodo$123') {
-        login(email);
+        await login(email);
         const isAdmin = email === 'admin@example.com';
         router.push(isAdmin ? '/admin' : '/student');
+        router.refresh(); // Ensure the page re-renders with new auth state
       } else {
         toast({
           title: 'ログイン失敗',
@@ -40,7 +40,14 @@ export default function LoginPage() {
         });
         setIsLoading(false);
       }
-    }, 1000);
+    } catch (error) {
+        toast({
+            title: 'ログインエラー',
+            description: '予期せぬエラーが発生しました。',
+            variant: 'destructive',
+        });
+        setIsLoading(false);
+    }
   };
 
   return (
