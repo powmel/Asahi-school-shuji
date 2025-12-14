@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, UserPlus, Sparkles, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, Sparkles, AlertCircle, Settings } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -17,7 +17,7 @@ import {
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, countStudentLessonsInMonth } from '@/lib/data';
+import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, countStudentLessonsInMonth, getAppSettings, getWeekOfMonth, AppSettings } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import {
@@ -27,14 +27,13 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 const courseMap: { [key in Student['course']]: { name: string; limit: number } } = {
@@ -91,7 +90,6 @@ function EditSlotDialog({
         if (!student) return false;
         const currentCount = studentMonthlyCounts[student.uid] ?? 0;
         const limit = courseMap[student.course].limit;
-        // Count as new if not originally in the slot
         const isNewAssignment = !slot.assignedStudentIds.includes(student.uid);
         const projectedCount = isNewAssignment ? currentCount + 1 : currentCount;
         return projectedCount > limit;
@@ -118,11 +116,11 @@ function EditSlotDialog({
   
   const getProjectedCount = (student: Student) => {
       const currentCount = studentMonthlyCounts[student.uid] ?? 0;
-      const isNewAssignment = slot ? !slot.assignedStudentIds.includes(student.uid) : false;
-      const isSelected = selectedStudentIds.includes(student.uid);
+      const isOriginallyInSlot = slot ? slot.assignedStudentIds.includes(student.uid) : false;
+      const isNowSelected = selectedStudentIds.includes(student.uid);
       
-      if (isSelected && isNewAssignment) return currentCount + 1;
-      if (!isSelected && !isNewAssignment) return currentCount -1;
+      if (isNowSelected && !isOriginallyInSlot) return currentCount + 1;
+      if (!isNowSelected && isOriginallyInSlot) return currentCount - 1;
       return currentCount;
   }
 
@@ -141,7 +139,7 @@ function EditSlotDialog({
               <p className="text-sm font-medium">定員: {selectedStudentIds.length} / {capacity}</p>
               {isOverCapacity && <Badge variant="destructive">定員オーバー</Badge>}
             </div>
-            {allStudents.map(student => {
+            {allStudents.filter(s => s.isActive).map(student => {
               const limit = courseMap[student.course].limit;
               const projectedCount = getProjectedCount(student);
               const isOverLimit = projectedCount > limit;
@@ -208,23 +206,36 @@ export default function SchedulePage() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const { toast } = useToast();
 
   const weekendDays = useMemo(() => {
+    if (!appSettings) return [];
+    
+    const monthKey = format(currentMonth, 'yyyy-MM');
+    const activeWeeks = appSettings.activeWeekendWeeksByMonth[monthKey] || appSettings.defaultActiveWeekendWeeks;
+
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end }).filter(day => isSaturday(day) || isSunday(day));
-  }, [currentMonth]);
+    return eachDayOfInterval({ start, end }).map(day => ({
+        day,
+        isWeekend: isSaturday(day) || isSunday(day),
+        isActive: activeWeeks.includes(getWeekOfMonth(day))
+    })).filter(d => d.isWeekend);
+
+  }, [currentMonth, appSettings]);
 
   const fetchData = async (month: Date) => {
     setLoading(true);
     try {
-        const [slotsData, studentsData] = await Promise.all([
+        const [slotsData, studentsData, settingsData] = await Promise.all([
             getSlotsForMonth(month),
-            getAllStudents()
+            getAllStudents(),
+            getAppSettings()
         ]);
         setSlots(slotsData);
         setAllStudents(studentsData);
+        setAppSettings(settingsData);
     } catch (error) {
         toast({ title: "エラー", description: "データの取得に失敗しました。", variant: "destructive" });
     } finally {
@@ -254,6 +265,10 @@ export default function SchedulePage() {
       <div>
         <PageHeader title="月間スケジューラ">
           <div className="flex items-center gap-2">
+            <Button variant="outline" disabled>
+                <Settings className="mr-2 h-4 w-4" />
+                開講日設定 (準備中)
+            </Button>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button variant="outline" disabled>
@@ -282,19 +297,24 @@ export default function SchedulePage() {
         
         <div className="overflow-x-auto rounded-lg border bg-card">
           <div className="grid grid-flow-col auto-cols-fr min-w-max">
-            {weekendDays.map(day => {
-              const daySlots = slots.filter(s => s.date === format(day, 'yyyy-MM-dd'));
+            {weekendDays.map(({day, isActive}) => {
               const dayString = format(day, 'yyyy-MM-dd');
+              const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
+              
               return (
-                <div key={day.toString()} className="flex flex-col border-r last:border-r-0">
-                  <Link href={`/admin/day/${dayString}`} className="block hover:bg-muted/50">
-                    <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "")}>
+                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0", !isActive && "bg-muted/30")}>
+                  <Link href={isActive ? `/admin/day/${dayString}` : '#'} className={cn("block", isActive && "hover:bg-muted/50", !isActive && "cursor-not-allowed")}>
+                    <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "", !isActive && "text-muted-foreground")}>
                       <p>{format(day, 'd')}</p>
                       <p className="text-xs">{format(day, 'E', { locale: ja })}</p>
                     </div>
                   </Link>
                   <div className="flex-grow">
                     {fixedTimeSlotsDefinition.map(timeDef => {
+                      if (!isActive) {
+                        return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground flex items-center justify-center">休講</div>
+                      }
+                      
                       const slot = daySlots.find(s => s.startTime === timeDef.startTime);
                       if (!slot) return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground">データなし</div>
                       

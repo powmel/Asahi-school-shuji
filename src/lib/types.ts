@@ -14,6 +14,8 @@ export type Student = {
   age?: number;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   displayTag?: string; // e.g. "小3・女"
+  notes?: string;
+  isActive: boolean;
 };
 
 export type TimeSlot = {
@@ -64,4 +66,10 @@ export type LessonWithDetails = Lesson & {
 export type SwapRequestWithDetails = SwapRequest & {
   studentName:string;
   fromLesson: LessonWithDetails;
+};
+
+export type AppSettings = {
+    activeWeekendWeeksByMonth: { [key: string]: `week${number}`[] };
+    defaultActiveWeekendWeeks: `week${number}`[];
+    defaultSlotCapacity: number;
 };

@@ -1,18 +1,34 @@
 // This file mocks data and API calls to a Firestore database.
 // In a real application, you would replace this with actual Firebase SDK calls.
 
-import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails } from './types';
-import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, getMonth, getYear } from 'date-fns';
+import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings } from './types';
+import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, getMonth, getYear, getDate, getDay } from 'date-fns';
 
 const ADMIN_UID = 'admin@example.com';
 
 const students: Student[] = [
-  { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女' },
-  { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15'), grade: '中1', age: 13, gender: 'male', displayTag: '中1/13歳/男' },
-  { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01'), grade: '高2', age: 17, gender: 'female', displayTag: '高2/17歳/女' },
-  { uid: 'student4', name: '高橋 健太', course: '3perMonth', email: 'student4@example.com', createdAt: new Date('2023-02-20'), grade: '大人', age: 35, gender: 'male', displayTag: '大人' },
-  { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05'), grade: '小5', age: 11, gender: 'female', displayTag: '小5/11歳/女'  },
+  { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女', isActive: true, notes: 'アレルギーあり' },
+  { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15'), grade: '中1', age: 13, gender: 'male', displayTag: '中1/13歳/男', isActive: true },
+  { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01'), grade: '高2', age: 17, gender: 'female', displayTag: '高2/17歳/女', isActive: true },
+  { uid: 'student4', name: '高橋 健太', course: '3perMonth', email: 'student4@example.com', createdAt: new Date('2023-02-20'), grade: '大人', age: 35, gender: 'male', displayTag: '大人', isActive: true },
+  { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05'), grade: '小5', age: 11, gender: 'female', displayTag: '小5/11歳/女', isActive: true, notes: '左利き' },
+  { uid: 'student6', name: '渡辺 翔太', course: '3perMonth', email: 'student6@example.com', createdAt: new Date('2023-04-10'), grade: '小6', age: 12, gender: 'male', displayTag: '小6/12歳/男', isActive: true },
+  { uid: 'student7', name: '山本 美咲', course: '2perMonth', email: 'student7@example.com', createdAt: new Date('2023-05-12'), grade: '中2', age: 14, gender: 'female', displayTag: '中2/14歳/女', isActive: true },
+  { uid: 'student8', name: '中村 蓮', course: '3perMonth', email: 'student8@example.com', createdAt: new Date('2023-06-18'), grade: '大人', age: 42, gender: 'male', displayTag: '大人', isActive: true },
+  { uid: 'student9', name: '小林 杏', course: '2perMonth', email: 'student9@example.com', createdAt: new Date('2023-07-22'), grade: '小2', age: 8, gender: 'female', displayTag: '小2/8歳/女', isActive: true },
+  { uid: 'student10', name: '加藤 陽菜', course: '3perMonth', email: 'student10@example.com', createdAt: new Date('2023-08-30'), grade: '小4', age: 10, gender: 'female', displayTag: '小4/10歳/女', isActive: true },
+  { uid: 'student11', name: '吉田 湊', course: '2perMonth', email: 'student11@example.com', createdAt: new Date('2023-09-05'), grade: '中3', age: 15, gender: 'male', displayTag: '中3/15歳/男', isActive: true },
+  { uid: 'student12', name: '山田 結衣', course: '3perMonth', email: 'student12@example.com', createdAt: new Date('2023-10-10'), grade: '高1', age: 16, gender: 'female', displayTag: '高1/16歳/女', isActive: true },
+  { uid: 'student13', name: '佐々木 陸', course: '2perMonth', email: 'student13@example.com', createdAt: new Date('2023-11-15'), grade: '大人', age: 28, gender: 'male', displayTag: '大人', isActive: true },
+  { uid: 'student14', name: '山口 莉子', course: '3perMonth', email: 'student14@example.com', createdAt: new Date('2023-12-20'), grade: '小1', age: 7, gender: 'female', displayTag: '小1/7歳/女', isActive: true },
+  { uid: 'student15', name: '松本 悠人', course: '2perMonth', email: 'student15@example.com', createdAt: new Date('2024-01-25'), grade: '小6', age: 12, gender: 'male', displayTag: '小6/12歳/男', isActive: true },
+  { uid: 'student16', name: '井上 楓', course: '3perMonth', email: 'student16@example.com', createdAt: new Date('2024-02-10'), grade: '中2', age: 14, gender: 'female', displayTag: '中2/14歳/女', isActive: true },
+  { uid: 'student17', name: '木村 拓海', course: '2perMonth', email: 'student17@example.com', createdAt: new Date('2024-03-18'), grade: '大人', age: 55, gender: 'male', displayTag: '大人', isActive: true, notes: '体験レッスン希望' },
+  { uid: 'student18', name: '林 芽衣', course: '3perMonth', email: 'student18@example.com', createdAt: new Date('2024-04-02'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女', isActive: true },
+  { uid: 'student19', name: '斎藤 蒼', course: '2perMonth', email: 'student19@example.com', createdAt: new Date('2024-05-09'), grade: '高3', age: 18, gender: 'male', displayTag: '高3/18歳/男', isActive: true },
+  { uid: 'student20', name: '橋本 凛', course: '3perMonth', email: 'student20@example.com', createdAt: new Date('2024-06-21'), grade: '中1', age: 13, gender: 'female', displayTag: '中1/13歳/女', isActive: false },
 ];
+
 
 export const fixedTimeSlotsDefinition = [
   { startTime: '10:00', endTime: '10:50' },
@@ -22,72 +38,89 @@ export const fixedTimeSlotsDefinition = [
   { startTime: '15:00', endTime: '15:50' },
 ];
 
-const DEFAULT_SLOT_CAPACITY = 4;
+let appSettings: AppSettings = {
+    defaultSlotCapacity: 4,
+    defaultActiveWeekendWeeks: ['week1', 'week2', 'week3'],
+    activeWeekendWeeksByMonth: {
+        // Example override for a specific month
+        // "2024-08": ["week2", "week3", "week4"]
+    }
+};
+
+/**
+ * Returns the week number of a date within its month.
+ * Assumes weeks start on Sunday.
+ * The first week is the one containing the 1st of the month.
+ * @param date The date to check.
+ * @returns The week number (1-5).
+ */
+export const getWeekOfMonth = (date: Date): `week${1|2|3|4|5}` => {
+    const dayOfMonth = getDate(date);
+    const dayOfWeek = getDay(date);
+    const week = Math.ceil((dayOfMonth - 1 - dayOfWeek + 7) / 7);
+    return `week${week}` as `week${1|2|3|4|5}`;
+};
+
 
 // Generate slots and lessons for the current and next month
 const generateInitialData = () => {
   let slots: TimeSlot[] = [];
   let lessons: Lesson[] = [];
   const today = new Date();
-  const monthsToGenerate = [today, addMonths(today, 1)];
+  const monthsToGenerate = [today, addMonths(today, 1), addMonths(today, 2)];
 
   monthsToGenerate.forEach(month => {
+    const monthKey = format(month, 'yyyy-MM');
+    const activeWeeks = appSettings.activeWeekendWeeksByMonth[monthKey] || appSettings.defaultActiveWeekendWeeks;
+
     const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
-    const weekendDays = days.filter(day => isSaturday(day) || isSunday(day));
+    const weekendDays = days.filter(day => {
+        const isWeekend = isSaturday(day) || isSunday(day);
+        const weekOfMonth = getWeekOfMonth(day);
+        return isWeekend && activeWeeks.includes(weekOfMonth);
+    });
 
     weekendDays.forEach(day => {
       fixedTimeSlotsDefinition.forEach(time => {
         const slotId = `${format(day, 'yyyy-MM-dd')}-${time.startTime}`;
-        
-        let assignedStudentIds: string[] = [];
-        // Make some slots full, some partial, some empty
-        const studentCountFactor = Math.random();
-        if (studentCountFactor > 0.7) { // Full
-          assignedStudentIds = ['student1', 'student2', 'student3', 'student4'].slice(0, DEFAULT_SLOT_CAPACITY);
-        } else if (studentCountFactor > 0.3) { // Partial
-          const studentCount = Math.floor(Math.random() * (DEFAULT_SLOT_CAPACITY -1)) + 1;
-          assignedStudentIds = students.slice(0, studentCount).map(s => s.uid);
-        }
-        
+        const assignedStudentIds: string[] = [];
+
         slots.push({
           slotId: slotId,
           date: format(day, 'yyyy-MM-dd'),
           startTime: time.startTime,
           endTime: time.endTime,
-          capacity: DEFAULT_SLOT_CAPACITY,
+          capacity: appSettings.defaultSlotCapacity,
           assignedStudentIds: assignedStudentIds,
-        });
-
-        assignedStudentIds.forEach(studentId => {
-          lessons.push({
-            lessonId: `lesson-${studentId}-${slotId}`,
-            studentId: studentId,
-            slotId: slotId,
-            status: 'approved', // Use 'approved' for counting
-            priority: 'normal',
-            updatedAt: day,
-          });
         });
       });
     });
   });
 
-  // Ensure some students are near/over their limits for demo
-  const currentMonth = getMonth(today);
-  const currentYear = getYear(today);
-  const student2Lessons = lessons.filter(l => l.studentId === 'student2' && getMonth(new Date(slots.find(s=>s.slotId === l.slotId)!.date)) === currentMonth && getYear(new Date(slots.find(s=>s.slotId === l.slotId)!.date)) === currentYear);
-  if (student2Lessons.length < 4) {
-      const availableSlot = slots.find(s => s.assignedStudentIds.length < s.capacity && !s.assignedStudentIds.includes('student2') && getMonth(new Date(s.date)) === currentMonth && getYear(new Date(s.date)) === currentYear);
-      if(availableSlot) {
-          availableSlot.assignedStudentIds.push('student2');
-          lessons.push({
-            lessonId: `lesson-student2-${availableSlot.slotId}`,
-            studentId: 'student2',
-            slotId: availableSlot.slotId,
-            status: 'approved',
-            priority: 'normal',
-            updatedAt: new Date(),
-          });
+  // Seed bookings for current month
+  const currentMonthSlots = slots.filter(s => s.date.startsWith(format(today, 'yyyy-MM')));
+  if (currentMonthSlots.length > 0) {
+      // student2 (3perMonth) -> 4 lessons (over limit)
+      for (let i = 0; i < 4; i++) {
+        const slot = currentMonthSlots[i*2];
+        if (slot && !slot.assignedStudentIds.includes('student2')) {
+          slot.assignedStudentIds.push('student2');
+          lessons.push({ lessonId: `lesson-student2-${slot.slotId}`, studentId: 'student2', slotId: slot.slotId, status: 'approved', priority: 'normal', updatedAt: new Date() });
+        }
+      }
+      // student1 (2perMonth) -> 2 lessons (at limit)
+       for (let i = 0; i < 2; i++) {
+        const slot = currentMonthSlots[i*3];
+        if (slot && !slot.assignedStudentIds.includes('student1')) {
+          slot.assignedStudentIds.push('student1');
+          lessons.push({ lessonId: `lesson-student1-${slot.slotId}`, studentId: 'student1', slotId: slot.slotId, status: 'approved', priority: 'normal', updatedAt: new Date() });
+        }
+      }
+       // student3 (2perMonth) -> 1 lesson (under limit)
+      const slotForS3 = currentMonthSlots[5];
+      if (slotForS3 && !slotForS3.assignedStudentIds.includes('student3')) {
+          slotForS3.assignedStudentIds.push('student3');
+          lessons.push({ lessonId: `lesson-student3-${slotForS3.slotId}`, studentId: 'student3', slotId: slotForS3.slotId, status: 'approved', priority: 'normal', updatedAt: new Date() });
       }
   }
 
@@ -181,6 +214,19 @@ export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
 
 // --- Admin Functions ---
 
+export const getAppSettings = async (): Promise<AppSettings> => {
+    return new Promise(resolve => setTimeout(() => resolve(appSettings), FAKE_DELAY / 2));
+}
+
+export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<AppSettings> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            appSettings = { ...appSettings, ...newSettings };
+            resolve(appSettings);
+        }, FAKE_DELAY);
+    });
+}
+
 export const getAllStudents = async (): Promise<Student[]> => {
     return new Promise(resolve => setTimeout(() => resolve(students), FAKE_DELAY));
 }
@@ -209,6 +255,41 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
         }, FAKE_DELAY);
     });
 };
+
+export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<Student> => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const index = students.findIndex(s => s.uid === studentId);
+            if (index !== -1) {
+                students[index] = { ...students[index], ...data };
+                resolve(students[index]);
+            } else {
+                reject(new Error("Student not found."));
+            }
+        }, FAKE_DELAY);
+    });
+};
+
+export const deleteStudent = async (studentId: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const initialLength = students.length;
+            students = students.filter(s => s.uid !== studentId);
+            if (students.length < initialLength) {
+                // Also remove their lessons
+                lessons = lessons.filter(l => l.studentId !== studentId);
+                // And remove from slots
+                slots.forEach(slot => {
+                    slot.assignedStudentIds = slot.assignedStudentIds.filter(id => id !== studentId);
+                });
+                resolve();
+            } else {
+                reject(new Error("Student not found."));
+            }
+        }, FAKE_DELAY);
+    });
+};
+
 
 export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
     return new Promise(resolve => {
