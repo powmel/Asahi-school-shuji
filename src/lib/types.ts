@@ -10,6 +10,10 @@ export type Student = {
   course: '2perMonth' | '3perMonth';
   email: string;
   createdAt: Date;
+  grade?: string; // e.g. "小3", "中1", "高2", "大人"
+  age?: number;
+  gender?: 'male' | 'female' | 'other' | 'unknown';
+  displayTag?: string; // e.g. "小3・女"
 };
 
 export type TimeSlot = {
@@ -25,7 +29,7 @@ export type Lesson = {
   lessonId: string;
   studentId: string;
   slotId: string;
-  status: 'scheduled' | 'swap_pending' | 'swapped' | 'canceled';
+  status: 'scheduled' | 'swap_pending' | 'swapped' | 'canceled' | 'approved';
   priority: 'fixed' | 'normal';
   updatedAt: Date;
 };
@@ -58,6 +62,6 @@ export type LessonWithDetails = Lesson & {
 };
 
 export type SwapRequestWithDetails = SwapRequest & {
-  studentName: string;
+  studentName:string;
   fromLesson: LessonWithDetails;
 };

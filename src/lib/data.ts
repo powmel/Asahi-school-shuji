@@ -2,16 +2,16 @@
 // In a real application, you would replace this with actual Firebase SDK calls.
 
 import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails } from './types';
-import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
+import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, getMonth, getYear } from 'date-fns';
 
 const ADMIN_UID = 'admin@example.com';
 
 const students: Student[] = [
-  { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10') },
-  { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15') },
-  { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01') },
-  { uid: 'student4', name: '高橋 健太', course: '3perMonth', email: 'student4@example.com', createdAt: new Date('2023-02-20') },
-  { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05') },
+  { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女' },
+  { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15'), grade: '中1', age: 13, gender: 'male', displayTag: '中1/13歳/男' },
+  { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01'), grade: '高2', age: 17, gender: 'female', displayTag: '高2/17歳/女' },
+  { uid: 'student4', name: '高橋 健太', course: '3perMonth', email: 'student4@example.com', createdAt: new Date('2023-02-20'), grade: '大人', age: 35, gender: 'male', displayTag: '大人' },
+  { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05'), grade: '小5', age: 11, gender: 'female', displayTag: '小5/11歳/女'  },
 ];
 
 export const fixedTimeSlotsDefinition = [
@@ -38,8 +38,16 @@ const generateInitialData = () => {
     weekendDays.forEach(day => {
       fixedTimeSlotsDefinition.forEach(time => {
         const slotId = `${format(day, 'yyyy-MM-dd')}-${time.startTime}`;
-        const studentCount = Math.floor(Math.random() * (DEFAULT_SLOT_CAPACITY + 1)); // 0 to capacity
-        const assignedStudentIds = students.slice(0, studentCount).map(s => s.uid);
+        
+        let assignedStudentIds: string[] = [];
+        // Make some slots full, some partial, some empty
+        const studentCountFactor = Math.random();
+        if (studentCountFactor > 0.7) { // Full
+          assignedStudentIds = ['student1', 'student2', 'student3', 'student4'].slice(0, DEFAULT_SLOT_CAPACITY);
+        } else if (studentCountFactor > 0.3) { // Partial
+          const studentCount = Math.floor(Math.random() * (DEFAULT_SLOT_CAPACITY -1)) + 1;
+          assignedStudentIds = students.slice(0, studentCount).map(s => s.uid);
+        }
         
         slots.push({
           slotId: slotId,
@@ -55,7 +63,7 @@ const generateInitialData = () => {
             lessonId: `lesson-${studentId}-${slotId}`,
             studentId: studentId,
             slotId: slotId,
-            status: 'scheduled',
+            status: 'approved', // Use 'approved' for counting
             priority: 'normal',
             updatedAt: day,
           });
@@ -63,6 +71,26 @@ const generateInitialData = () => {
       });
     });
   });
+
+  // Ensure some students are near/over their limits for demo
+  const currentMonth = getMonth(today);
+  const currentYear = getYear(today);
+  const student2Lessons = lessons.filter(l => l.studentId === 'student2' && getMonth(new Date(slots.find(s=>s.slotId === l.slotId)!.date)) === currentMonth && getYear(new Date(slots.find(s=>s.slotId === l.slotId)!.date)) === currentYear);
+  if (student2Lessons.length < 4) {
+      const availableSlot = slots.find(s => s.assignedStudentIds.length < s.capacity && !s.assignedStudentIds.includes('student2') && getMonth(new Date(s.date)) === currentMonth && getYear(new Date(s.date)) === currentYear);
+      if(availableSlot) {
+          availableSlot.assignedStudentIds.push('student2');
+          lessons.push({
+            lessonId: `lesson-student2-${availableSlot.slotId}`,
+            studentId: 'student2',
+            slotId: availableSlot.slotId,
+            status: 'approved',
+            priority: 'normal',
+            updatedAt: new Date(),
+          });
+      }
+  }
+
 
   return { slots, lessons };
 };
@@ -166,6 +194,38 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     });
 }
 
+export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(slots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime)));
+        }, FAKE_DELAY);
+    });
+}
+
+export const getStudentDetails = async (studentId: string): Promise<Student | undefined> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(findStudent(studentId));
+        }, FAKE_DELAY);
+    });
+};
+
+export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const monthStr = format(month, 'yyyy-MM');
+            const count = lessons.filter(l => {
+                const slot = findSlot(l.slotId);
+                return l.studentId === studentId &&
+                       l.status === 'approved' &&
+                       slot &&
+                       slot.date.startsWith(monthStr);
+            }).length;
+            resolve(count);
+        }, FAKE_DELAY);
+    });
+}
+
 export const updateSlotAssignments = async (slotId: string, studentIds: string[]): Promise<TimeSlot> => {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -192,7 +252,7 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
                         lessonId: `lesson-${studentId}-${slotId}`,
                         studentId: studentId,
                         slotId: slotId,
-                        status: 'scheduled',
+                        status: 'approved',
                         priority: 'normal',
                         updatedAt: new Date(),
                     });

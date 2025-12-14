@@ -46,13 +46,14 @@ export default function StudentsPage() {
   return (
     <div>
       <PageHeader title="生徒管理">
-        <Button>新規生徒追加</Button>
+        <Button disabled>新規生徒追加</Button>
       </PageHeader>
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>名前</TableHead>
+              <TableHead>詳細</TableHead>
               <TableHead>メールアドレス</TableHead>
               <TableHead>コース</TableHead>
               <TableHead>登録日</TableHead>
@@ -63,6 +64,7 @@ export default function StudentsPage() {
             {students.length > 0 ? students.map(student => (
               <TableRow key={student.uid}>
                 <TableCell className="font-medium">{student.name}</TableCell>
+                <TableCell className="text-muted-foreground">{student.displayTag}</TableCell>
                 <TableCell>{student.email}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{courseMap[student.course]}</Badge>
@@ -78,15 +80,15 @@ export default function StudentsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>操作</DropdownMenuLabel>
-                      <DropdownMenuItem>編集</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">削除</DropdownMenuItem>
+                      <DropdownMenuItem disabled>編集</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" disabled>削除</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
             )) : (
                 <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">生徒情報がありません。</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center">生徒情報がありません。</TableCell>
                 </TableRow>
             )}
           </TableBody>
