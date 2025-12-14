@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +26,7 @@ export function AppLayout({ sidebar, header, children }: AppLayoutProps) {
     <SidebarProvider>
       <Sidebar>{sidebar}</Sidebar>
       <SidebarInset className="bg-muted/30">
-        <div className="flex h-full flex-col">
+        <div className="flex h-screen flex-col">
           {header}
           <main className="flex-1 overflow-y-auto p-4 pt-6 md:p-8">
             {children}
@@ -35,3 +36,5 @@ export function AppLayout({ sidebar, header, children }: AppLayoutProps) {
     </SidebarProvider>
   );
 }
+
+    

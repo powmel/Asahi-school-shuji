@@ -404,7 +404,7 @@ export default function MonthlySchedulerPage() {
   if (loading) return <Loading />;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem-1px)]">
+    <div className="flex flex-col h-full">
       <PageHeader title="月間割り振り">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => handleMonthChange('prev')}>
@@ -507,3 +507,5 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
+
+    
