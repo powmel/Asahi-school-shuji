@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, Sparkles } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -16,7 +16,7 @@ import {
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { getSlotsForMonth, getAllStudents, updateSlotAssignments } from '@/lib/data';
+import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import {
@@ -31,8 +31,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-const fixedTimeSlots = [ "10:00", "11:00", "13:00", "14:00", "15:00" ];
+const courseMap: { [key: string]: string } = {
+  '2perMonth': '月2',
+  '3perMonth': '月3',
+};
+
 
 function EditSlotDialog({
   open,
@@ -92,7 +97,7 @@ function EditSlotDialog({
                   );
                 }}
               />
-              <Label htmlFor={`student-${student.uid}`}>{student.name}</Label>
+              <Label htmlFor={`student-${student.uid}`}>{student.name} <Badge variant="outline" className="ml-2">{courseMap[student.course]}</Badge></Label>
             </div>
           ))}
         </div>
@@ -156,71 +161,86 @@ export default function SchedulePage() {
   if(loading) return <Loading />;
 
   return (
-    <div>
-      <PageHeader title="月間スケジューラ">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="w-32 text-center font-headline font-semibold text-lg">
-            {format(currentMonth, 'yyyy年 M月')}
-          </span>
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </PageHeader>
-      
-      <div className="overflow-x-auto rounded-lg border bg-card">
-        <div className="grid grid-flow-col auto-cols-fr min-w-max">
-          {weekendDays.map(day => {
-            const daySlots = slots.filter(s => s.date === format(day, 'yyyy-MM-dd'));
-            return (
-              <div key={day.toString()} className="flex flex-col border-r last:border-r-0">
-                <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "")}>
-                  <p>{format(day, 'd')}</p>
-                  <p className="text-xs">{format(day, 'E', { locale: ja })}</p>
+    <TooltipProvider>
+      <div>
+        <PageHeader title="月間スケジューラ">
+          <div className="flex items-center gap-2">
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="outline" disabled>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        自動割り振り (準備中)
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>日時指定を優先し、月2・月3コースを考慮して自動配置する機能は今後追加予定</p>
+                </TooltipContent>
+            </Tooltip>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="w-32 text-center font-headline font-semibold text-lg">
+                {format(currentMonth, 'yyyy年 M月')}
+              </span>
+              <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </PageHeader>
+        
+        <div className="overflow-x-auto rounded-lg border bg-card">
+          <div className="grid grid-flow-col auto-cols-fr min-w-max">
+            {weekendDays.map(day => {
+              const daySlots = slots.filter(s => s.date === format(day, 'yyyy-MM-dd'));
+              return (
+                <div key={day.toString()} className="flex flex-col border-r last:border-r-0">
+                  <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "")}>
+                    <p>{format(day, 'd')}</p>
+                    <p className="text-xs">{format(day, 'E', { locale: ja })}</p>
+                  </div>
+                  <div className="flex-grow">
+                    {fixedTimeSlotsDefinition.map(timeDef => {
+                      const slot = daySlots.find(s => s.startTime === timeDef.startTime);
+                      if (!slot) return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground">データなし</div>
+                      
+                      const occupancy = slot.assignedStudentIds.length;
+                      const capacity = slot.capacity;
+                      const isFull = occupancy >= capacity;
+                      
+                      return (
+                        <div key={slot.slotId} className={cn("h-24 border-b p-2 text-xs relative group")}>
+                          <p className="font-semibold">{slot.startTime}</p>
+                          <p>
+                            {isFull ? <span className='font-bold text-destructive'>満席</span> : '空き'}
+                            : {occupancy}/{capacity}
+                          </p>
+                          <Button
+                              variant="ghost" size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => setEditingSlot(slot)}
+                          >
+                              <UserPlus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex-grow">
-                  {fixedTimeSlots.map(time => {
-                    const slot = daySlots.find(s => s.startTime === time);
-                    if (!slot) return <div key={time} className="h-24 border-b p-2 text-xs text-muted-foreground">データなし</div>
-                    
-                    const occupancy = slot.assignedStudentIds.length;
-                    const capacity = slot.capacity;
-                    const occupancyRate = capacity > 0 ? occupancy / capacity : 0;
-                    
-                    let bgColor = 'bg-green-100 dark:bg-green-900/50';
-                    if (occupancyRate >= 0.5) bgColor = 'bg-yellow-100 dark:bg-yellow-900/50';
-                    if (occupancyRate === 1) bgColor = 'bg-red-100 dark:bg-red-900/50';
-                    
-                    return (
-                      <div key={slot.slotId} className={cn("h-24 border-b p-2 text-xs relative group", bgColor)}>
-                        <p className="font-semibold">{slot.startTime}</p>
-                        <p>定員: {occupancy}/{capacity}</p>
-                        <Button
-                            variant="ghost" size="icon"
-                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => setEditingSlot(slot)}
-                        >
-                            <UserPlus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+         <EditSlotDialog
+          open={!!editingSlot}
+          onOpenChange={(isOpen) => !isOpen && setEditingSlot(null)}
+          slot={editingSlot}
+          allStudents={allStudents}
+          onSave={handleSlotSave}
+        />
       </div>
-       <EditSlotDialog
-        open={!!editingSlot}
-        onOpenChange={(isOpen) => !isOpen && setEditingSlot(null)}
-        slot={editingSlot}
-        allStudents={allStudents}
-        onSave={handleSlotSave}
-      />
-    </div>
+    </TooltipProvider>
   );
 }

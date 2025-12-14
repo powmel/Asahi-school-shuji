@@ -25,7 +25,7 @@ import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import { format } from 'date-fns';
 
-const courseMap = {
+const courseMap: { [key in Student['course']]: string } = {
   '2perMonth': '月2回コース',
   '3perMonth': '月3回コース',
 };

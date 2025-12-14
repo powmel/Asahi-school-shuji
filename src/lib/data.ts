@@ -2,7 +2,7 @@
 // In a real application, you would replace this with actual Firebase SDK calls.
 
 import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails } from './types';
-import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, set } from 'date-fns';
+import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
 
 const ADMIN_UID = 'admin@example.com';
 
@@ -14,13 +14,15 @@ const students: Student[] = [
   { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05') },
 ];
 
-const fixedTimeSlots = [
+export const fixedTimeSlotsDefinition = [
   { startTime: '10:00', endTime: '10:50' },
   { startTime: '11:00', endTime: '11:50' },
   { startTime: '13:00', endTime: '13:50' },
   { startTime: '14:00', endTime: '14:50' },
   { startTime: '15:00', endTime: '15:50' },
 ];
+
+const DEFAULT_SLOT_CAPACITY = 4;
 
 // Generate slots and lessons for the current and next month
 const generateInitialData = () => {
@@ -34,9 +36,9 @@ const generateInitialData = () => {
     const weekendDays = days.filter(day => isSaturday(day) || isSunday(day));
 
     weekendDays.forEach(day => {
-      fixedTimeSlots.forEach(time => {
+      fixedTimeSlotsDefinition.forEach(time => {
         const slotId = `${format(day, 'yyyy-MM-dd')}-${time.startTime}`;
-        const studentCount = Math.floor(Math.random() * 3); // 0 to 2 students
+        const studentCount = Math.floor(Math.random() * (DEFAULT_SLOT_CAPACITY + 1)); // 0 to capacity
         const assignedStudentIds = students.slice(0, studentCount).map(s => s.uid);
         
         slots.push({
@@ -44,7 +46,7 @@ const generateInitialData = () => {
           date: format(day, 'yyyy-MM-dd'),
           startTime: time.startTime,
           endTime: time.endTime,
-          capacity: 4,
+          capacity: DEFAULT_SLOT_CAPACITY,
           assignedStudentIds: assignedStudentIds,
         });
 
@@ -54,6 +56,7 @@ const generateInitialData = () => {
             studentId: studentId,
             slotId: slotId,
             status: 'scheduled',
+            priority: 'normal',
             updatedAt: day,
           });
         });
@@ -190,6 +193,7 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
                         studentId: studentId,
                         slotId: slotId,
                         status: 'scheduled',
+                        priority: 'normal',
                         updatedAt: new Date(),
                     });
                 }

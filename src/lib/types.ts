@@ -26,6 +26,7 @@ export type Lesson = {
   studentId: string;
   slotId: string;
   status: 'scheduled' | 'swap_pending' | 'swapped' | 'canceled';
+  priority: 'fixed' | 'normal';
   updatedAt: Date;
 };
 
