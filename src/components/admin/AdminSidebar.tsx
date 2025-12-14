@@ -8,14 +8,16 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Calendar, LayoutDashboard, Users, Repeat, Megaphone, Brush, CalendarClock, CalendarDays } from "lucide-react";
 import Link from 'next/link';
 import { UserNav } from '@/components/UserNav';
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { useMemo } from 'react';
 
-const todayPathForLink = `/admin/day/${format(startOfDay(new Date()), 'yyyy-MM-dd')}`;
+const todayPathForLink = `/admin/day/${format(new Date(), 'yyyy-MM-dd')}`;
 
 export const menuItems = [
     { href: '/admin', label: 'ダッシュボード', icon: LayoutDashboard, exact: true },
@@ -29,24 +31,37 @@ export const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { state } = useSidebar();
   
   const isActive = (item: typeof menuItems[0]) => {
     if (item.base) {
-        return pathname.startsWith(item.base)
+      return pathname.startsWith(item.base);
     }
     if (item.exact) {
       return pathname === item.href;
     }
-    return pathname.startsWith(item.href);
-  }
+    return pathname.startsWith(item.href) && item.href !== '/admin';
+  };
+  
+  const activeItemLabel = useMemo(() => {
+    const activeItem = menuItems.find(isActive);
+    return activeItem ? activeItem.label : 'ダッシュボード';
+  }, [pathname]);
 
   return (
     <>
-      <SidebarHeader className="border-b border-border/50">
-        <div className="flex items-center gap-2 p-2">
-            <Brush className="h-6 w-6 text-primary" />
-            <h2 className="font-headline text-lg font-semibold">管理者パネル</h2>
-        </div>
+      <SidebarHeader className="border-b border-border/50 p-2">
+        <SidebarTrigger asChild>
+            <div className="flex w-full cursor-pointer items-center gap-2">
+                <Brush className="h-6 w-6 shrink-0 text-primary" />
+                <div className="flex-grow overflow-hidden">
+                    <h2 className="font-headline text-lg font-semibold truncate">管理者パネル</h2>
+                    <p className="text-xs text-muted-foreground truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+                        {activeItemLabel}
+                    </p>
+                </div>
+            </div>
+        </SidebarTrigger>
       </SidebarHeader>
       <SidebarContent className="p-2">
         <SidebarMenu>
@@ -55,6 +70,7 @@ export function AdminSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={isActive(item)}
+                tooltip={{ children: item.label }}
               >
                 <Link href={item.href}>
                   <item.icon />
