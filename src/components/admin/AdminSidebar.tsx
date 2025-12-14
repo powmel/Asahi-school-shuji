@@ -23,11 +23,11 @@ const todayPathForLink = `/admin/day/${format(new Date(), 'yyyy-MM-dd')}`;
 export const menuItems = [
     { href: '/admin', label: 'ダッシュボード', icon: LayoutDashboard, exact: true },
     { href: '/admin/schedule', label: '月間スケジュール', icon: Calendar },
-    { href: '/admin/monthly-scheduler', label: '月間割り振り', icon: CalendarDays },
+    { href: '/admin/monthly-scheduler', label: '月間割り振り', icon: CalendarDays, base: '/admin/monthly-scheduler' },
     { href: todayPathForLink, label: '本日の運営', icon: CalendarClock, base: '/admin/day' },
-    { href: '/admin/students', label: '生徒管理', icon: Users },
-    { href: '/admin/swaps', label: '振替申請管理', icon: Repeat },
-    { href: '/admin/announcements', label: 'お知らせ管理', icon: Megaphone },
+    { href: '/admin/students', label: '生徒管理', icon: Users, base: '/admin/students' },
+    { href: '/admin/swaps', label: '振替申請管理', icon: Repeat, base: '/admin/swaps' },
+    { href: '/admin/announcements', label: 'お知らせ管理', icon: Megaphone, base: '/admin/announcements' },
 ];
 
 export function AdminSidebar() {
@@ -50,24 +50,25 @@ export function AdminSidebar() {
   
   const activeItemLabel = useMemo(() => {
     // Find the most specific match first
-    const specificItem = menuItems.slice().reverse().find(isActive);
+    const specificItem = [...menuItems].reverse().find(isActive);
     return specificItem ? specificItem.label : 'ダッシュボード';
   }, [pathname]);
 
   return (
     <>
-      <SidebarHeader className="border-b border-border/50 p-2">
-        <SidebarTrigger asChild>
-            <div className="flex w-full cursor-pointer items-center gap-2">
-                <Brush className="h-6 w-6 shrink-0 text-primary" />
-                <div className="flex-grow overflow-hidden">
-                    <h2 className="font-headline text-lg font-semibold truncate">管理者パネル</h2>
-                    <p className="text-xs text-muted-foreground truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
-                        {activeItemLabel}
-                    </p>
-                </div>
+      <SidebarHeader className="border-b border-border/50 p-2 flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-grow cursor-pointer" onClick={() => {
+            const trigger = document.querySelector('[data-sidebar="trigger"]') as HTMLElement;
+            trigger?.click();
+        }}>
+            <Brush className="h-6 w-6 shrink-0 text-primary" />
+            <div className="flex-grow overflow-hidden">
+                <h2 className="font-headline text-lg font-semibold truncate">管理者パネル</h2>
+                <p className="text-xs text-muted-foreground truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+                    {activeItemLabel}
+                </p>
             </div>
-        </SidebarTrigger>
+        </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
         <SidebarMenu>
