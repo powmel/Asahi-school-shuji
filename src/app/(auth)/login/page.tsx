@@ -28,7 +28,7 @@ export default function LoginPage() {
 
     // Mock authentication
     setTimeout(() => {
-      if ((email === 'admin@example.com' || email.startsWith('student')) && password === 'password') {
+      if ((email === 'admin@example.com' || email.startsWith('student')) && password === 'Shodo$123') {
         login(email);
         const isAdmin = email === 'admin@example.com';
         router.push(isAdmin ? '/admin' : '/student');
@@ -88,8 +88,8 @@ export default function LoginPage() {
               />
             </div>
             <div className="pt-2 text-xs text-muted-foreground">
-              <p>生徒: student1@example.com / password</p>
-              <p>管理者: admin@example.com / password</p>
+              <p>生徒: student1@example.com / Shodo$123</p>
+              <p>管理者: admin@example.com / Shodo$123</p>
             </div>
           </CardContent>
           <CardFooter>
