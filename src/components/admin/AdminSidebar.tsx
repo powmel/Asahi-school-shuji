@@ -9,7 +9,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Calendar, LayoutDashboard, Users, Repeat, Megaphone, Brush, CalendarClock } from "lucide-react";
+import { Calendar, LayoutDashboard, Users, Repeat, Megaphone, Brush, CalendarClock, CalendarDays } from "lucide-react";
 import Link from 'next/link';
 import { UserNav } from '@/components/UserNav';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 const menuItems = [
   { href: '/admin', label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/admin/schedule', label: '月間スケジュール', icon: Calendar },
+  { href: '/admin/monthly-scheduler', label: '月間割り振り', icon: CalendarDays },
   { href: `/admin/day/${format(new Date(), 'yyyy-MM-dd')}`, label: '本日の運営', icon: CalendarClock },
   { href: '/admin/students', label: '生徒管理', icon: Users },
   { href: '/admin/swaps', label: '振替申請管理', icon: Repeat },
