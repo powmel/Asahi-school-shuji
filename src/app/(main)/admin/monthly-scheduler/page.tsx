@@ -37,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const courseMap: { [key in Student['course']]: { name: string; limit: number } } = {
   '2perMonth': { name: '月2', limit: 2 },
@@ -54,7 +55,7 @@ function StudentCard({ student, selected, onSelect }: { student: StudentWithUsag
     <div
       onClick={onSelect}
       className={cn(
-        "p-2 rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-all w-28 h-24 flex-shrink-0",
+        "p-2 rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-all w-28 h-24 flex-shrink-0 relative",
         selected ? "border-primary ring-2 ring-primary bg-primary/10" : "bg-card hover:bg-muted/50",
         isOverLimit ? "border-destructive bg-destructive/10" : "",
         isAtLimit && !isOverLimit ? "border-yellow-500 bg-yellow-500/10" : ""
@@ -77,7 +78,6 @@ function DateBucket({
   onSelectDate,
   onRemoveStudent,
   onSelectStudent,
-  isSelected,
   selectedStudentId,
 }: {
   date: string;
@@ -86,7 +86,6 @@ function DateBucket({
   onSelectDate: () => void;
   onRemoveStudent: (studentId: string, date: string) => void;
   onSelectStudent: (studentId: string) => void;
-  isSelected: boolean;
   selectedStudentId: string | null;
 }) {
   const totalCapacity = slots.reduce((acc, s) => acc + s.capacity, 0);
@@ -97,8 +96,7 @@ function DateBucket({
     <Card
       onClick={onSelectDate}
       className={cn(
-        "w-48 flex-shrink-0 cursor-pointer transition-all h-[400px] flex flex-col",
-        isSelected ? "border-primary ring-2 ring-primary" : "hover:shadow-md"
+        "cursor-pointer transition-all hover:shadow-md h-full flex flex-col",
       )}
     >
       <CardHeader className="text-center pb-2">
@@ -110,12 +108,12 @@ function DateBucket({
       </CardHeader>
       <CardContent className="flex-grow bg-muted/20 rounded-b-lg p-2 space-y-1 overflow-y-auto">
         {students.map(student => (
-          <div 
-            key={student.uid} 
+          <div
+            key={student.uid}
             onClick={(e) => { e.stopPropagation(); onSelectStudent(student.uid); }}
             className={cn(
-                "group bg-background p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
-                selectedStudentId === student.uid && "ring-2 ring-primary"
+              "group bg-background p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
+              selectedStudentId === student.uid && "ring-2 ring-primary"
             )}
           >
             <span className="truncate">{student.name}</span>
@@ -135,7 +133,7 @@ function DateBucket({
 }
 
 function isSunday(date: Date) {
-    return date.getDay() === 0;
+  return date.getDay() === 0;
 }
 
 function SlotAssignmentPanel({
@@ -145,7 +143,6 @@ function SlotAssignmentPanel({
   onUnassign,
   onSelectStudent,
   selectedStudentId,
-  selectedDate,
 }: {
   slots: TimeSlot[];
   allStudents: Student[];
@@ -153,7 +150,6 @@ function SlotAssignmentPanel({
   onUnassign: (studentId: string, slotId: string) => void;
   onSelectStudent: (studentId: string) => void;
   selectedStudentId: string | null;
-  selectedDate: string | null;
 }) {
 
   const handleSlotClick = (slot: TimeSlot) => {
@@ -163,16 +159,16 @@ function SlotAssignmentPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 max-h-[60vh] overflow-y-auto p-1">
       {slots.map(slot => {
         const isFull = slot.assignedStudentIds.length >= slot.capacity;
         return (
-          <div 
-            key={slot.slotId} 
+          <div
+            key={slot.slotId}
             className={cn(
               "p-3 border rounded-lg",
-              selectedStudentId && "cursor-pointer hover:bg-muted/50",
-              isFull && "cursor-not-allowed hover:bg-transparent"
+              selectedStudentId && !isFull && "cursor-pointer hover:bg-muted/50",
+              isFull && "cursor-not-allowed bg-muted/40"
             )}
             onClick={() => !isFull && handleSlotClick(slot)}
           >
@@ -186,12 +182,12 @@ function SlotAssignmentPanel({
               {slot.assignedStudentIds.map(studentId => {
                 const student = allStudents.find(s => s.uid === studentId);
                 return (
-                  <div 
-                    key={studentId} 
+                  <div
+                    key={studentId}
                     onClick={(e) => { e.stopPropagation(); onSelectStudent(studentId); }}
                     className={cn(
-                        "group bg-muted/50 p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
-                        selectedStudentId === studentId && "ring-2 ring-primary"
+                      "group bg-muted/50 p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
+                      selectedStudentId === studentId && "ring-2 ring-primary"
                     )}
                   >
                     <span className="truncate">{student?.name || '不明'}</span>
@@ -223,6 +219,7 @@ export default function MonthlySchedulerPage() {
   const [loading, setLoading] = useState(true);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isSlotPanelOpen, setIsSlotPanelOpen] = useState(false);
   const [studentToConfirm, setStudentToConfirm] = useState<Student | null>(null);
   const [assignmentAction, setAssignmentAction] = useState<(() => void) | null>(null);
   const { toast } = useToast();
@@ -231,7 +228,7 @@ export default function MonthlySchedulerPage() {
     return allStudents
       .filter(s => s.isActive)
       .map(s => ({ ...s, usage: studentUsage[s.uid] || 0 }))
-      .sort((a,b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [allStudents, studentUsage]);
 
   const activeDates = useMemo(() => {
@@ -277,124 +274,133 @@ export default function MonthlySchedulerPage() {
   const handleSelectStudent = (studentId: string) => {
     setSelectedStudentId(prev => (prev === studentId ? null : studentId));
   };
-  
+
   const handleSelectDate = (date: string) => {
+    setSelectedDate(date);
     if (selectedStudentId) {
-        assignStudent(selectedStudentId, date);
+      assignStudent(selectedStudentId, date);
     } else {
-        setSelectedDate(prev => (prev === date ? null : date));
+      setIsSlotPanelOpen(true);
     }
   };
 
   const assignStudent = async (studentId: string, dateOrSlotId: string) => {
-      const student = studentsWithUsage.find(s => s.uid === studentId);
-      if (!student) return;
+    const student = studentsWithUsage.find(s => s.uid === studentId);
+    if (!student) return;
 
-      const isSlotId = dateOrSlotId.includes(':');
-      const targetDate = isSlotId ? allSlots.find(s => s.slotId === dateOrSlotId)?.date : dateOrSlotId;
+    const isSlotId = dateOrSlotId.includes(':');
+    const targetDate = isSlotId ? allSlots.find(s => s.slotId === dateOrSlotId)?.date : dateOrSlotId;
 
-      if (!targetDate) {
-        toast({ title: "エラー", description: "有効な日付またはスロットではありません。", variant: "destructive"});
-        return;
-      }
-      
-      const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+    if (!targetDate) {
+      toast({ title: "エラー", description: "有効な日付またはスロットではありません。", variant: "destructive" });
+      return;
+    }
 
-      const isSameDate = originalSlot?.date === targetDate;
-      const isNewAssignmentToMonth = !originalSlot;
-      const effectiveUsage = isNewAssignmentToMonth ? student.usage + 1 : student.usage;
-      
-      const { limit } = courseMap[student.course];
-      if (effectiveUsage > limit && !isSameDate) {
-          setStudentToConfirm(student);
-          setAssignmentAction(() => () => {
-              if (isSlotId) {
-                  handleAssignment(studentId, dateOrSlotId, true);
-              } else {
-                  assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
-              }
-          });
-          return;
-      }
+    const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
 
-      if (isSlotId) {
-        await handleAssignment(studentId, dateOrSlotId, true);
-      } else {
-        await assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
-      }
+    const isSameDate = originalSlot?.date === targetDate;
+    const isNewAssignmentToMonth = !originalSlot;
+    const effectiveUsage = isNewAssignmentToMonth ? student.usage + 1 : student.usage;
+
+    const { limit } = courseMap[student.course];
+    if (effectiveUsage > limit && !isSameDate) {
+      setStudentToConfirm(student);
+      setAssignmentAction(() => () => {
+        if (isSlotId) {
+          handleAssignment(studentId, dateOrSlotId, true);
+        } else {
+          assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+        }
+        setIsSlotPanelOpen(false);
+      });
+      return;
+    }
+
+    if (isSlotId) {
+      await handleAssignment(studentId, dateOrSlotId, true);
+      setIsSlotPanelOpen(false);
+    } else {
+      await assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+    }
   };
 
   const assignStudentToFirstAvailableSlot = async (studentId: string, date: string) => {
-      const dateSlots = allSlots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime));
-      const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity);
+    const dateSlots = allSlots.filter(s => s.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity);
 
-      if (availableSlot) {
-        await handleAssignment(studentId, availableSlot.slotId, true);
-      } else {
-        toast({ title: "失敗", description: "この日の空きスロットがありません。", variant: "destructive" });
-      }
-      setSelectedStudentId(null);
+    if (availableSlot) {
+      await handleAssignment(studentId, availableSlot.slotId, true);
+    } else {
+      toast({ title: "失敗", description: "この日の空きスロットがありません。", variant: "destructive" });
+    }
+    setSelectedStudentId(null);
   }
-  
+
   const handleConfirmOverLimit = () => {
     if (assignmentAction) {
-        assignmentAction();
+      assignmentAction();
     }
     setStudentToConfirm(null);
     setAssignmentAction(null);
   };
-  
+
   const handleAssignment = async (studentId: string, slotId: string, assign: boolean) => {
-      try {
-          const student = allStudents.find(s => s.uid === studentId);
-          if (!student) throw new Error("Student not found");
+    try {
+      const student = allStudents.find(s => s.uid === studentId);
+      if (!student) throw new Error("Student not found");
 
-          const targetSlot = allSlots.find(s => s.slotId === slotId);
-          if (!targetSlot) throw new Error("Slot not found");
+      const targetSlot = allSlots.find(s => s.slotId === slotId);
+      if (!targetSlot) throw new Error("Slot not found");
 
-          if (assign) {
-              if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
-                  toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive"});
-                  return;
-              }
-              if (targetSlot.assignedStudentIds.includes(studentId)) {
-                  // Moving within the same day, do nothing here and wait for the un-assignment
-              }
-          }
-          
-          // First, remove from old slot if exists in the current month
-          const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
-          if (originalSlot && originalSlot.slotId !== targetSlot.slotId) {
-              await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
-          }
-
-          let newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
-          if (assign) {
-            newTargetStudentIds.push(studentId);
-          }
-          
-          await updateSlotAssignments(slotId, newTargetStudentIds);
-          
-          await fetchData(currentMonth); // Re-fetch all data to ensure consistency
-          toast({ title: "成功", description: `割り当てを更新しました。`});
-
-      } catch (error) {
-          toast({ title: "エラー", description: "割り当ての更新に失敗しました。", variant: "destructive" });
-      } finally {
-        setSelectedStudentId(null);
+      if (assign) {
+        if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
+          toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive" });
+          return;
+        }
+        if (targetSlot.assignedStudentIds.includes(studentId)) {
+          // Moving within the same day, do nothing here and wait for the un-assignment
+        }
       }
+
+      // First, remove from old slot if exists in the current month
+      const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+      if (originalSlot && originalSlot.slotId !== targetSlot.slotId) {
+        await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
+      }
+
+      let newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
+      if (assign) {
+        newTargetStudentIds.push(studentId);
+      }
+
+      await updateSlotAssignments(slotId, newTargetStudentIds);
+
+      await fetchData(currentMonth); // Re-fetch all data to ensure consistency
+      toast({ title: "成功", description: `割り当てを更新しました。` });
+
+    } catch (error) {
+      toast({ title: "エラー", description: "割り当ての更新に失敗しました。", variant: "destructive" });
+    } finally {
+      setSelectedStudentId(null);
+    }
   };
 
   const handleRemoveStudentFromDate = async (studentId: string, date: string) => {
-      const slot = allSlots.find(s => s.date === date && s.assignedStudentIds.includes(studentId));
-      if (slot) {
-          await handleAssignment(studentId, slot.slotId, false);
-      }
+    const slot = allSlots.find(s => s.date === date && s.assignedStudentIds.includes(studentId));
+    if (slot) {
+      await handleAssignment(studentId, slot.slotId, false);
+    }
   };
 
   const handleAssignToSlot = (studentId: string, slotId: string) => {
     assignStudent(studentId, slotId);
   };
+
+  useEffect(() => {
+    if(!isSlotPanelOpen) {
+        setSelectedDate(null);
+    }
+  }, [isSlotPanelOpen]);
 
   if (loading) return <Loading />;
 
@@ -432,12 +438,10 @@ export default function MonthlySchedulerPage() {
         </ScrollArea>
       </div>
 
-      <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
-        {/* Zone B: Date Buckets */}
-        <div className="md:col-span-2 pb-4">
+      {/* Zone B: Date Buckets */}
+      <div className="flex-grow pb-4 overflow-y-auto">
           <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-          <ScrollArea className="h-full w-full whitespace-nowrap">
-            <div className="flex gap-4 pb-4 px-1 h-[420px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeDates.map(date => {
                 const dateSlots = allSlots.filter(s => s.date === date);
                 const studentIdsOnDate = new Set(dateSlots.flatMap(s => s.assignedStudentIds));
@@ -451,21 +455,22 @@ export default function MonthlySchedulerPage() {
                     onSelectDate={() => handleSelectDate(date)}
                     onRemoveStudent={handleRemoveStudentFromDate}
                     onSelectStudent={handleSelectStudent}
-                    isSelected={selectedDate === date}
                     selectedStudentId={selectedStudentId}
                   />
                 );
               })}
             </div>
-             <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-
-        {/* Zone C: Time Slot Assignment */}
-        <div className="pb-4 md:col-span-1">
-          <h3 className="font-headline text-lg mb-2">時間スロット</h3>
-          <ScrollArea className="h-full pr-4">
-            {selectedDate ? (
+      </div>
+      
+      <Dialog open={isSlotPanelOpen} onOpenChange={setIsSlotPanelOpen}>
+        <DialogContent className="max-w-md">
+            <DialogHeader>
+                <DialogTitle>時間スロット割り当て</DialogTitle>
+                <DialogDescription>
+                    {selectedDate ? format(new Date(selectedDate), 'yyyy年M月d日', {locale: ja}) : ''}
+                </DialogDescription>
+            </DialogHeader>
+             {selectedDate ? (
               <SlotAssignmentPanel
                 slots={allSlots.filter(s => s.date === selectedDate).sort((a,b) => a.startTime.localeCompare(b.startTime))}
                 allStudents={allStudents}
@@ -473,18 +478,16 @@ export default function MonthlySchedulerPage() {
                 onUnassign={(studentId, slotId) => handleAssignment(studentId, slotId, false)}
                 onSelectStudent={handleSelectStudent}
                 selectedStudentId={selectedStudentId}
-                selectedDate={selectedDate}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground bg-muted/20 rounded-lg">
-                <p>日付を選択してください</p>
+                <p>エラー：日付が選択されていません</p>
               </div>
             )}
-          </ScrollArea>
-        </div>
-      </div>
-      
-       <AlertDialog open={!!studentToConfirm} onOpenChange={(open) => !open && setStudentToConfirm(null)}>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!studentToConfirm} onOpenChange={(open) => !open && setStudentToConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
@@ -503,3 +506,4 @@ export default function MonthlySchedulerPage() {
   );
 }
 
+    
