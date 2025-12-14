@@ -1,3 +1,4 @@
+
 export type User = {
   uid: string;
   email: string | null;
@@ -15,7 +16,12 @@ export type Student = {
   gender?: 'male' | 'female' | 'other' | 'unknown';
   displayTag?: string; // e.g. "小3・女"
   notes?: string;
-  isActive: boolean;
+  isActive: boolean; // Replaces isEnrolled, true = 在籍中, false = 休会中
+  preferredSlot: {
+    enabled: boolean;
+    dow: 'sat' | 'sun' | 'either';
+    slotKey: string; // HH:mm
+  }
 };
 
 export type TimeSlot = {
@@ -34,6 +40,8 @@ export type Lesson = {
   status: 'scheduled' | 'swap_pending' | 'swapped' | 'canceled' | 'approved';
   priority: 'fixed' | 'normal';
   updatedAt: Date;
+  createdBy: 'student' | 'teacher';
+  source?: 'preferredSlotAuto' | 'manual';
 };
 
 export type SwapRequest = {
@@ -69,7 +77,6 @@ export type SwapRequestWithDetails = SwapRequest & {
 };
 
 export type AppSettings = {
-    activeWeekendWeeksByMonth: { [key: string]: `week${number}`[] };
-    defaultActiveWeekendWeeks: `week${number}`[];
+    activeDatesByMonth: { [key: string]: string[] }; // YYYY-MM -> ["YYYY-MM-DD", ...]
     defaultSlotCapacity: number;
 };

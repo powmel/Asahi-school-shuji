@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, UserPlus, Sparkles, AlertCircle, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, Sparkles, AlertCircle, Settings, Star } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -17,7 +18,7 @@ import {
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, countStudentLessonsInMonth, getAppSettings, getWeekOfMonth, AppSettings } from '@/lib/data';
+import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, countStudentLessonsInMonth, getAppSettings, AppSettings, getDefaultActiveDatesForMonth } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import {
@@ -72,9 +73,12 @@ function EditSlotDialog({
     if (open && allStudents.length > 0) {
       const fetchCounts = async () => {
         const counts: Record<string, number> = {};
-        for (const student of allStudents) {
-          counts[student.uid] = await countStudentLessonsInMonth(student.uid, currentMonth);
-        }
+        const promises = allStudents.map(student =>
+            countStudentLessonsInMonth(student.uid, currentMonth).then(count => {
+                counts[student.uid] = count;
+            })
+        );
+        await Promise.all(promises);
         setStudentMonthlyCounts(counts);
       };
       fetchCounts();
@@ -143,6 +147,7 @@ function EditSlotDialog({
               const limit = courseMap[student.course].limit;
               const projectedCount = getProjectedCount(student);
               const isOverLimit = projectedCount > limit;
+              const isPreferredSlot = student.preferredSlot.enabled && student.preferredSlot.slotKey === slot?.startTime;
 
               return (
                 <div key={student.uid} className="flex items-center justify-between space-x-2 pr-2">
@@ -157,6 +162,7 @@ function EditSlotDialog({
                       }}
                     />
                     <Label htmlFor={`student-${student.uid}`} className="flex items-center gap-2">
+                      {isPreferredSlot && <Star className="h-4 w-4 text-yellow-500 fill-yellow-400" />}
                       <span>{student.name}</span>
                       <Badge variant="outline" className="font-normal">{courseMap[student.course].name}</Badge>
                       <span className={cn('text-xs', isOverLimit ? 'text-destructive font-bold' : 'text-muted-foreground')}>
@@ -213,14 +219,14 @@ export default function SchedulePage() {
     if (!appSettings) return [];
     
     const monthKey = format(currentMonth, 'yyyy-MM');
-    const activeWeeks = appSettings.activeWeekendWeeksByMonth[monthKey] || appSettings.defaultActiveWeekendWeeks;
+    const activeDates = appSettings.activeDatesByMonth[monthKey] || getDefaultActiveDatesForMonth(currentMonth);
 
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     return eachDayOfInterval({ start, end }).map(day => ({
         day,
         isWeekend: isSaturday(day) || isSunday(day),
-        isActive: activeWeeks.includes(getWeekOfMonth(day))
+        isActive: activeDates.includes(format(day, 'yyyy-MM-dd'))
     })).filter(d => d.isWeekend);
 
   }, [currentMonth, appSettings]);
@@ -302,7 +308,7 @@ export default function SchedulePage() {
               const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
               
               return (
-                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0", !isActive && "bg-muted/30")}>
+                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0 w-32", !isActive && "bg-muted/30")}>
                   <Link href={isActive ? `/admin/day/${dayString}` : '#'} className={cn("block", isActive && "hover:bg-muted/50", !isActive && "cursor-not-allowed")}>
                     <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "", !isActive && "text-muted-foreground")}>
                       <p>{format(day, 'd')}</p>
@@ -316,7 +322,7 @@ export default function SchedulePage() {
                       }
                       
                       const slot = daySlots.find(s => s.startTime === timeDef.startTime);
-                      if (!slot) return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground">データなし</div>
+                      if (!slot) return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground flex items-center justify-center">データなし</div>
                       
                       const occupancy = slot.assignedStudentIds.length;
                       const capacity = slot.capacity;

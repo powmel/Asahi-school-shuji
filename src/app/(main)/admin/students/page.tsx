@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Table,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, FilePenLine, Trash2 } from 'lucide-react';
+import { MoreHorizontal, FilePenLine, Trash2, Clock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,11 +41,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from '@/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth } from '@/lib/data';
 import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -53,33 +56,114 @@ const courseMap: { [key in Student['course']]: {name: string, limit: number} } =
   '3perMonth': { name: '月3回コース', limit: 3 },
 };
 
+function PreferredSlotDialog({
+    student,
+    open,
+    onOpenChange,
+    onStudentUpdate
+}: {
+    student: Student,
+    open: boolean,
+    onOpenChange: (open: boolean) => void,
+    onStudentUpdate: () => void,
+}) {
+    const [prefs, setPrefs] = useState(student.preferredSlot);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        setPrefs(student.preferredSlot);
+    }, [student]);
+
+    const handleSave = async () => {
+        try {
+            await updateStudent(student.uid, { preferredSlot: prefs });
+            toast({ title: '成功', description: '希望日時を更新しました。'});
+            onStudentUpdate();
+            onOpenChange(false);
+        } catch (e) {
+            toast({ title: '失敗', description: '更新に失敗しました。', variant: 'destructive'});
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>授業時間指定</DialogTitle>
+                    <DialogDescription>{student.name}さんの希望日時を設定します。有効にすると、空きがある場合に自動で予約が確保されます。</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-6">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="pref-enabled" checked={prefs.enabled} onCheckedChange={enabled => setPrefs(p => ({...p, enabled}))} />
+                        <Label htmlFor="pref-enabled">希望日時を有効にする</Label>
+                    </div>
+
+                    <fieldset disabled={!prefs.enabled} className="space-y-4">
+                         <div>
+                            <Label className="text-base font-medium">希望曜日</Label>
+                            <RadioGroup value={prefs.dow} onValueChange={(dow: 'sat' | 'sun' | 'either') => setPrefs(p => ({...p, dow}))} className="mt-2 grid grid-cols-3 gap-4">
+                                <div><RadioGroupItem value="sat" id="dow-sat" className="peer sr-only" /><Label htmlFor="dow-sat" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">土曜日</Label></div>
+                                <div><RadioGroupItem value="sun" id="dow-sun" className="peer sr-only" /><Label htmlFor="dow-sun" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">日曜日</Label></div>
+                                <div><RadioGroupItem value="either" id="dow-either" className="peer sr-only" /><Label htmlFor="dow-either" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">どちらでも</Label></div>
+                            </RadioGroup>
+                        </div>
+                        <div>
+                             <Label htmlFor="slot-key" className="text-base font-medium">希望時間</Label>
+                             <Select value={prefs.slotKey} onValueChange={(slotKey: string) => setPrefs(p => ({...p, slotKey}))}>
+                                <SelectTrigger id="slot-key" className="mt-2">
+                                    <SelectValue placeholder="時間を選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10:00">10:00</SelectItem>
+                                    <SelectItem value="11:00">11:00</SelectItem>
+                                    <SelectItem value="13:00">13:00</SelectItem>
+                                    <SelectItem value="14:00">14:00</SelectItem>
+                                    <SelectItem value="15:00">15:00</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>キャンセル</Button>
+                    <Button onClick={handleSave}>保存</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function StudentEditSheet({ 
     student, 
     open, 
     onOpenChange,
-    onStudentUpdate
+    onStudentUpdate,
+    currentMonth
 }: { 
     student: Student | null, 
     open: boolean, 
     onOpenChange: (open: boolean) => void,
     onStudentUpdate: () => void,
+    currentMonth: Date
 }) {
     const [formData, setFormData] = useState<Partial<Student>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isPrefDialogOpen, setIsPrefDialogOpen] = useState(false);
     const [monthlyCount, setMonthlyCount] = useState<number | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
         if (student) {
             setFormData(student);
-            countStudentLessonsInMonth(student.uid, startOfMonth(new Date()))
+            countStudentLessonsInMonth(student.uid, currentMonth)
                 .then(setMonthlyCount);
         } else {
-            setFormData({ name: '', email: '', course: '2perMonth', isActive: true });
+            setFormData({ name: '', email: '', course: '2perMonth', isActive: true, preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } });
             setMonthlyCount(null);
         }
-    }, [student]);
+    }, [student, currentMonth]);
 
     const handleFieldChange = (field: keyof Student, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -128,7 +212,7 @@ function StudentEditSheet({
                     <div className="space-y-6 py-6">
                         <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
                             <div>
-                                <p className="text-sm text-muted-foreground">今月のレッスン回数</p>
+                                <p className="text-sm text-muted-foreground">{format(currentMonth, 'M月')}のレッスン回数</p>
                                 <p className="text-2xl font-bold">
                                     {monthlyCount !== null ? `${monthlyCount} / ${currentPlan.limit}` : '読込中...'}
                                 </p>
@@ -196,9 +280,29 @@ function StudentEditSheet({
                         </div>
 
                     </div>
-                    <SheetFooter>
-                        <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>削除</Button>
-                        <div className="flex-grow" />
+                    <SheetFooter className="grid grid-cols-2 gap-2 sm:flex">
+                        <Button variant="outline" onClick={() => setIsPrefDialogOpen(true)}>
+                            <Clock className="mr-2 h-4 w-4"/>
+                            時間指定
+                        </Button>
+                        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                           <AlertDialogTrigger asChild>
+                             <Button variant="destructive">削除</Button>
+                           </AlertDialogTrigger>
+                           <AlertDialogContent>
+                               <AlertDialogHeader>
+                                   <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                      「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
+                                   </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                   <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                   <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
+                               </AlertDialogFooter>
+                           </AlertDialogContent>
+                        </AlertDialog>
+                        <div className="hidden sm:flex-grow" />
                         <SheetClose asChild>
                             <Button variant="outline">キャンセル</Button>
                         </SheetClose>
@@ -209,20 +313,14 @@ function StudentEditSheet({
                 </SheetContent>
             </Sheet>
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                        <AlertDialogDescription>
-                           「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            { isPrefDialogOpen && 
+                <PreferredSlotDialog 
+                    student={student}
+                    open={isPrefDialogOpen}
+                    onOpenChange={setIsPrefDialogOpen}
+                    onStudentUpdate={onStudentUpdate}
+                />
+            }
         </>
     )
 }
@@ -234,12 +332,12 @@ export default function StudentsPage() {
   const [monthlyCounts, setMonthlyCounts] = useState<Record<string, number>>({});
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (month: Date) => {
     setLoading(true);
     try {
         const data = await getAllStudents();
         setStudents(data);
-        await fetchMonthlyCounts(data, currentMonth);
+        await fetchMonthlyCounts(data, month);
     } catch (e) {
         // handle error
     } finally {
@@ -249,14 +347,17 @@ export default function StudentsPage() {
 
   const fetchMonthlyCounts = async (studentList: Student[], month: Date) => {
       const counts: Record<string, number> = {};
-      for (const student of studentList) {
-          counts[student.uid] = await countStudentLessonsInMonth(student.uid, month);
-      }
+      const promises = studentList.map(student => 
+        countStudentLessonsInMonth(student.uid, month).then(count => {
+            counts[student.uid] = count;
+        })
+      );
+      await Promise.all(promises);
       setMonthlyCounts(counts);
   }
 
   useEffect(() => {
-    fetchStudents();
+    fetchStudents(currentMonth);
   }, [currentMonth]);
   
   const handleStudentSelect = (student: Student) => {
@@ -264,7 +365,11 @@ export default function StudentsPage() {
   }
 
   const onStudentUpdate = () => {
-      fetchStudents();
+      fetchStudents(currentMonth);
+  }
+
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+      setCurrentMonth(current => direction === 'prev' ? subMonths(current, 1) : addMonths(current, 1));
   }
 
   if (loading) return <Loading />;
@@ -272,7 +377,12 @@ export default function StudentsPage() {
   return (
     <div>
       <PageHeader title="生徒管理">
-        <Button disabled>新規生徒追加</Button>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => handleMonthChange('prev')}>&lt;</Button>
+            <span className="w-28 text-center font-semibold">{format(currentMonth, 'yyyy年 M月')}</span>
+            <Button variant="outline" onClick={() => handleMonthChange('next')}>&gt;</Button>
+            <Button disabled>新規生徒追加</Button>
+        </div>
       </PageHeader>
       <div className="rounded-lg border bg-card">
         <Table>
@@ -280,7 +390,7 @@ export default function StudentsPage() {
             <TableRow>
               <TableHead>名前</TableHead>
               <TableHead>コース</TableHead>
-              <TableHead>今月のレッスン</TableHead>
+              <TableHead>レッスン回数</TableHead>
               <TableHead>ステータス</TableHead>
               <TableHead>登録日</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -303,7 +413,7 @@ export default function StudentsPage() {
                 </TableCell>
                 <TableCell>{format(student.createdAt, 'yyyy/MM/dd')}</TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
+                  <DropdownMenu onOpenChange={(open) => open && setSelectedStudent(student)}>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0" onClick={e => e.stopPropagation()}>
                         <span className="sr-only">メニューを開く</span>
@@ -316,10 +426,29 @@ export default function StudentsPage() {
                         <FilePenLine className="mr-2 h-4 w-4" />
                         編集
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleStudentSelect(student)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        削除
-                      </DropdownMenuItem>
+                       <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                               <Trash2 className="mr-2 h-4 w-4" />
+                               削除
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                           <AlertDialogContent>
+                               <AlertDialogHeader>
+                                   <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                      「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
+                                   </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                   <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                   <AlertDialogAction onClick={() => {
+                                       handleDelete();
+                                       setSelectedStudent(null);
+                                   }} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
+                               </AlertDialogFooter>
+                           </AlertDialogContent>
+                       </AlertDialog>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -338,7 +467,18 @@ export default function StudentsPage() {
         open={!!selectedStudent}
         onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}
         onStudentUpdate={onStudentUpdate}
+        currentMonth={currentMonth}
       />
     </div>
   );
+  async function handleDelete() {
+      if (!selectedStudent) return;
+      try {
+          await deleteStudent(selectedStudent.uid);
+          toast({ title: '成功', description: '生徒が削除されました。'});
+          onStudentUpdate();
+      } catch (error) {
+          toast({ title: '失敗', description: '削除に失敗しました。', variant: 'destructive'});
+      }
+  }
 }
