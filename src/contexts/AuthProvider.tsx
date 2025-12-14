@@ -37,9 +37,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = useCallback((uid: string) => {
     const userData = { uid: uid, email: uid };
+    setLoading(true); // Prevent UI flicker during redirect
     setUser(userData);
-    Cookies.set('user', JSON.stringify(userData), { expires: 7 }); // expires in 7 days
-    setLoading(false);
+    Cookies.set('user', JSON.stringify(userData), { expires: 7 });
+    // setLoading will be false on the new page load's useEffect
   }, []);
 
   const logout = useCallback(() => {
