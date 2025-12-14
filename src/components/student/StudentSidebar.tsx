@@ -14,13 +14,20 @@ import Link from 'next/link';
 import { UserNav } from '@/components/UserNav';
 
 const menuItems = [
-  { href: '/student', label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/student', label: 'ダッシュボード', icon: LayoutDashboard, exact: true },
   { href: '/student/lessons', label: '全授業一覧', icon: Calendar },
   { href: '/student/announcements', label: 'お知らせ', icon: Megaphone },
 ];
 
 export function StudentSidebar() {
   const pathname = usePathname();
+
+  const isActive = (item: typeof menuItems[0]) => {
+    if (item.exact) {
+      return pathname === item.href;
+    }
+    return pathname.startsWith(item.href);
+  };
 
   return (
     <>
@@ -36,7 +43,7 @@ export function StudentSidebar() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={isActive(item)}
               >
                 <Link href={item.href}>
                   <item.icon />

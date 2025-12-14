@@ -12,20 +12,33 @@ import {
 import { Calendar, LayoutDashboard, Users, Repeat, Megaphone, Brush, CalendarClock, CalendarDays } from "lucide-react";
 import Link from 'next/link';
 import { UserNav } from '@/components/UserNav';
-import { format } from 'date-fns';
-
-const menuItems = [
-  { href: '/admin', label: 'ダッシュボード', icon: LayoutDashboard },
-  { href: '/admin/schedule', label: '月間スケジュール', icon: Calendar },
-  { href: '/admin/monthly-scheduler', label: '月間割り振り', icon: CalendarDays },
-  { href: `/admin/day/${format(new Date(), 'yyyy-MM-dd')}`, label: '本日の運営', icon: CalendarClock },
-  { href: '/admin/students', label: '生徒管理', icon: Users },
-  { href: '/admin/swaps', label: '振替申請管理', icon: Repeat },
-  { href: '/admin/announcements', label: 'お知らせ管理', icon: Megaphone },
-];
+import { format, startOfDay } from 'date-fns';
+import { useMemo } from 'react';
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  
+  const todayPath = useMemo(() => `/admin/day/${format(startOfDay(new Date()), 'yyyy-MM-dd')}`, []);
+
+  const menuItems = [
+    { href: '/admin', label: 'ダッシュボード', icon: LayoutDashboard, exact: true },
+    { href: '/admin/schedule', label: '月間スケジュール', icon: Calendar },
+    { href: '/admin/monthly-scheduler', label: '月間割り振り', icon: CalendarDays },
+    { href: todayPath, label: '本日の運営', icon: CalendarClock, base: '/admin/day' },
+    { href: '/admin/students', label: '生徒管理', icon: Users },
+    { href: '/admin/swaps', label: '振替申請管理', icon: Repeat },
+    { href: '/admin/announcements', label: 'お知らせ管理', icon: Megaphone },
+  ];
+
+  const isActive = (item: typeof menuItems[0]) => {
+    if (item.exact) {
+      return pathname === item.href;
+    }
+    if (item.base) {
+        return pathname.startsWith(item.base)
+    }
+    return pathname.startsWith(item.href);
+  }
 
   return (
     <>
@@ -38,10 +51,10 @@ export function AdminSidebar() {
       <SidebarContent className="p-2">
         <SidebarMenu>
           {menuItems.map(item => (
-            <SidebarMenuItem key={item.href}>
+            <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname.startsWith(item.href) && (item.href.includes('/admin/day') ? pathname.startsWith('/admin/day') : (item.href !== '/admin' || pathname === '/admin'))}
+                isActive={isActive(item)}
               >
                 <Link href={item.href}>
                   <item.icon />
