@@ -1,3 +1,4 @@
+
 "use client";
 
 import { usePathname } from 'next/navigation';
@@ -40,12 +41,17 @@ export function AdminSidebar() {
     if (item.exact) {
       return pathname === item.href;
     }
-    return pathname.startsWith(item.href) && item.href !== '/admin';
+    // Handle /admin being a prefix for all other admin routes
+    if (item.href === '/admin') {
+        return pathname === '/admin';
+    }
+    return pathname.startsWith(item.href);
   };
   
   const activeItemLabel = useMemo(() => {
-    const activeItem = menuItems.find(isActive);
-    return activeItem ? activeItem.label : 'ダッシュボード';
+    // Find the most specific match first
+    const specificItem = menuItems.slice().reverse().find(isActive);
+    return specificItem ? specificItem.label : 'ダッシュボード';
   }, [pathname]);
 
   return (
