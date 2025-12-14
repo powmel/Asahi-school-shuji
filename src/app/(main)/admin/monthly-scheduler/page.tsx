@@ -55,7 +55,7 @@ function StudentCard({ student, selected, onSelect }: { student: StudentWithUsag
     <div
       onClick={onSelect}
       className={cn(
-        "p-2 rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-all w-28 h-24 flex-shrink-0 relative",
+        "p-2 rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-all w-full h-24 flex-shrink-0 relative",
         selected ? "border-primary ring-2 ring-primary bg-primary/10" : "bg-card hover:bg-muted/50",
         isOverLimit ? "border-destructive bg-destructive/10" : "",
         isAtLimit && !isOverLimit ? "border-yellow-500 bg-yellow-500/10" : ""
@@ -423,18 +423,17 @@ export default function MonthlySchedulerPage() {
       {/* Zone A: Student Pool */}
       <div className="pb-4">
         <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
-        <ScrollArea className="w-full whitespace-nowrap">
-          <div className="flex gap-3 pb-4 px-1">
-            {studentsWithUsage.map(student => (
-              <StudentCard
-                key={student.uid}
-                student={student}
-                selected={selectedStudentId === student.uid}
-                onSelect={() => handleSelectStudent(student.uid)}
-              />
-            ))}
-          </div>
-          <ScrollBar orientation="horizontal" />
+        <ScrollArea className="h-56">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-1">
+                {studentsWithUsage.map(student => (
+                  <StudentCard
+                    key={student.uid}
+                    student={student}
+                    selected={selectedStudentId === student.uid}
+                    onSelect={() => handleSelectStudent(student.uid)}
+                  />
+                ))}
+            </div>
         </ScrollArea>
       </div>
 
@@ -505,5 +504,7 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
+
+    
 
     
