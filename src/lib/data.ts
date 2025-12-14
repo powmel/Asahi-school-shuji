@@ -1,12 +1,13 @@
+
 // This file mocks data and API calls to a Firestore database.
 // In a real application, you would replace this with actual Firebase SDK calls.
 
-import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings } from './types';
+import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
 import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, getMonth, getYear, getDate, getDay } from 'date-fns';
 
 const ADMIN_UID = 'admin@example.com';
 
-const students: Student[] = [
+let students: Student[] = [
   { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女', isActive: true, notes: 'アレルギーあり' },
   { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15'), grade: '中1', age: 13, gender: 'male', displayTag: '中1/13歳/男', isActive: true },
   { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01'), grade: '高2', age: 17, gender: 'female', displayTag: '高2/17歳/女', isActive: true },
@@ -57,7 +58,10 @@ let appSettings: AppSettings = {
 export const getWeekOfMonth = (date: Date): `week${1|2|3|4|5}` => {
     const dayOfMonth = getDate(date);
     const dayOfWeek = getDay(date);
-    const week = Math.ceil((dayOfMonth - 1 - dayOfWeek + 7) / 7);
+    // This calculation is a bit tricky. It finds the "day number" of the first day of the week,
+    // then calculates the week number.
+    const firstDayOfMonth = new Date(getYear(date), getMonth(date), 1);
+    const week = Math.ceil((dayOfMonth + firstDayOfMonth.getDay()) / 7);
     return `week${week}` as `week${1|2|3|4|5}`;
 };
 
@@ -76,8 +80,9 @@ const generateInitialData = () => {
     const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
     const weekendDays = days.filter(day => {
         const isWeekend = isSaturday(day) || isSunday(day);
+        if (!isWeekend) return false;
         const weekOfMonth = getWeekOfMonth(day);
-        return isWeekend && activeWeeks.includes(weekOfMonth);
+        return activeWeeks.includes(weekOfMonth);
     });
 
     weekendDays.forEach(day => {
@@ -298,7 +303,7 @@ export const countStudentLessonsInMonth = async (studentId: string, month: Date)
             const count = lessons.filter(l => {
                 const slot = findSlot(l.slotId);
                 return l.studentId === studentId &&
-                       l.status === 'approved' &&
+                       (l.status === 'approved' || l.status === 'scheduled') &&
                        slot &&
                        slot.date.startsWith(monthStr);
             }).length;
@@ -376,7 +381,7 @@ export const saveAnnouncement = async (announcement: Partial<Announcement>): Pro
     });
 }
 
-export const getAllSwapRequests = async () => {
+export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
      return new Promise(resolve => {
         setTimeout(() => {
             const detailedRequests = swapRequests.map(req => {
@@ -391,7 +396,7 @@ export const getAllSwapRequests = async () => {
                     studentName: lessonDetails.studentName,
                     fromLesson: lessonDetails,
                 }
-            }).filter(Boolean);
+            }).filter((r): r is SwapRequestWithDetails => r !== null);
             resolve(detailedRequests);
         }, FAKE_DELAY);
      });
@@ -438,3 +443,5 @@ export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' |
         }, FAKE_DELAY);
     });
 };
+
+    
