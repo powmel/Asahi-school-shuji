@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Star, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loading } from '@/components/shared/Loading';
 import { cn } from '@/lib/utils';
 import {
@@ -55,17 +55,19 @@ function StudentCard({ student, selected, onSelect }: { student: StudentWithUsag
     <div
       onClick={onSelect}
       className={cn(
-        "p-2 rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-all w-full h-24 flex-shrink-0 relative",
+        "p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all w-full h-16 flex-shrink-0 relative",
         selected ? "border-primary ring-2 ring-primary bg-primary/10" : "bg-card hover:bg-muted/50",
         isOverLimit ? "border-destructive bg-destructive/10" : "",
         isAtLimit && !isOverLimit ? "border-yellow-500 bg-yellow-500/10" : ""
       )}
     >
-      <p className="font-semibold text-sm text-center truncate w-full">{student.name}</p>
-      <Badge variant="outline" className="mt-1 text-xs">{courseMap[student.course].name}</Badge>
-      <p className={cn("text-xs mt-1", isOverLimit ? "text-destructive font-bold" : "text-muted-foreground")}>
-        {student.usage} / {limit}
-      </p>
+      <div className='flex flex-col'>
+        <p className="font-semibold text-sm truncate">{student.name}</p>
+        <p className={cn("text-xs", isOverLimit ? "text-destructive font-bold" : "text-muted-foreground")}>
+          {student.usage} / {limit}回
+        </p>
+      </div>
+      <Badge variant="outline" className="text-xs">{courseMap[student.course].name}</Badge>
       {student.preferredSlot.enabled && <Star className="h-3 w-3 text-yellow-500 fill-yellow-400 absolute top-1 right-1" />}
     </div>
   );
@@ -100,7 +102,7 @@ function DateBucket({
       )}
     >
       <CardHeader className="text-center pb-2">
-        <CardTitle className={cn("text-lg", isSunday(dateObj) ? "text-destructive" : "")}>
+        <CardTitle className={cn("text-lg", dateObj.getDay() === 0 ? "text-destructive" : "")}>
           {format(dateObj, 'd')}
           <span className="text-sm font-normal ml-1">({format(dateObj, 'E', { locale: ja })})</span>
         </CardTitle>
@@ -132,10 +134,6 @@ function DateBucket({
   );
 }
 
-function isSunday(date: Date) {
-  return date.getDay() === 0;
-}
-
 function SlotAssignmentPanel({
   slots,
   allStudents,
@@ -154,7 +152,11 @@ function SlotAssignmentPanel({
 
   const handleSlotClick = (slot: TimeSlot) => {
     if (selectedStudentId) {
-      onAssign(selectedStudentId, slot.slotId);
+      if (slot.assignedStudentIds.includes(selectedStudentId)) {
+        // If student is already in this slot, do nothing or unassign
+      } else {
+        onAssign(selectedStudentId, slot.slotId);
+      }
     }
   }
 
@@ -168,7 +170,7 @@ function SlotAssignmentPanel({
             className={cn(
               "p-3 border rounded-lg",
               selectedStudentId && !isFull && "cursor-pointer hover:bg-muted/50",
-              isFull && "cursor-not-allowed bg-muted/40"
+              isFull && !slot.assignedStudentIds.includes(selectedStudentId || '') && "cursor-not-allowed bg-muted/40"
             )}
             onClick={() => !isFull && handleSlotClick(slot)}
           >
@@ -357,9 +359,6 @@ export default function MonthlySchedulerPage() {
           toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive" });
           return;
         }
-        if (targetSlot.assignedStudentIds.includes(studentId)) {
-          // Moving within the same day, do nothing here and wait for the un-assignment
-        }
       }
 
       // First, remove from old slot if exists in the current month
@@ -406,7 +405,7 @@ export default function MonthlySchedulerPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <PageHeader title="月間割り振り">
+      <PageHeader title="">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => handleMonthChange('prev')}>
             <ChevronLeft className="h-4 w-4" />
@@ -420,45 +419,49 @@ export default function MonthlySchedulerPage() {
         </div>
       </PageHeader>
 
-      {/* Zone A: Student Pool */}
-      <div className="pb-4">
-        <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
-        <ScrollArea className="h-56">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-1">
-                {studentsWithUsage.map(student => (
-                  <StudentCard
-                    key={student.uid}
-                    student={student}
-                    selected={selectedStudentId === student.uid}
-                    onSelect={() => handleSelectStudent(student.uid)}
-                  />
-                ))}
-            </div>
-        </ScrollArea>
-      </div>
+      <div className="flex-1 grid md:grid-cols-3 gap-4 overflow-hidden">
+        {/* Zone A: Student Pool */}
+        <div className="flex flex-col">
+            <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
+            <ScrollArea className="flex-1 pr-2">
+                <div className="space-y-2">
+                    {studentsWithUsage.map(student => (
+                    <StudentCard
+                        key={student.uid}
+                        student={student}
+                        selected={selectedStudentId === student.uid}
+                        onSelect={() => handleSelectStudent(student.uid)}
+                    />
+                    ))}
+                </div>
+            </ScrollArea>
+        </div>
 
-      {/* Zone B: Date Buckets */}
-      <div className="flex-grow pb-4 overflow-y-auto">
-          <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-              {activeDates.map(date => {
-                const dateSlots = allSlots.filter(s => s.date === date);
-                const studentIdsOnDate = new Set(dateSlots.flatMap(s => s.assignedStudentIds));
-                const studentsOnDate = allStudents.filter(s => studentIdsOnDate.has(s.uid));
-                return (
-                  <DateBucket
-                    key={date}
-                    date={date}
-                    students={studentsOnDate}
-                    slots={dateSlots}
-                    onSelectDate={() => handleSelectDate(date)}
-                    onRemoveStudent={handleRemoveStudentFromDate}
-                    onSelectStudent={handleSelectStudent}
-                    selectedStudentId={selectedStudentId}
-                  />
-                );
-              })}
-            </div>
+        {/* Zone B: Date Buckets */}
+        <div className="md:col-span-2 flex flex-col">
+            <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
+            <ScrollArea className='flex-1'>
+                <div className="grid md:grid-cols-2 gap-4 pb-4">
+                    {activeDates.map(date => {
+                        const dateSlots = allSlots.filter(s => s.date === date);
+                        const studentIdsOnDate = new Set(dateSlots.flatMap(s => s.assignedStudentIds));
+                        const studentsOnDate = allStudents.filter(s => studentIdsOnDate.has(s.uid));
+                        return (
+                        <DateBucket
+                            key={date}
+                            date={date}
+                            students={studentsOnDate}
+                            slots={dateSlots}
+                            onSelectDate={() => handleSelectDate(date)}
+                            onRemoveStudent={handleRemoveStudentFromDate}
+                            onSelectStudent={handleSelectStudent}
+                            selectedStudentId={selectedStudentId}
+                        />
+                        );
+                    })}
+                </div>
+            </ScrollArea>
+        </div>
       </div>
       
       <Dialog open={isSlotPanelOpen} onOpenChange={setIsSlotPanelOpen}>
@@ -505,6 +508,3 @@ export default function MonthlySchedulerPage() {
   );
 }
 
-    
-
-    
