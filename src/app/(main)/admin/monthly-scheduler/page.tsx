@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -6,7 +7,6 @@ import {
   startOfMonth,
   addMonths,
   subMonths,
-  isSameMonth,
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -76,14 +76,18 @@ function DateBucket({
   slots,
   onSelectDate,
   onRemoveStudent,
+  onSelectStudent,
   isSelected,
+  selectedStudentId,
 }: {
   date: string;
   students: Student[];
   slots: TimeSlot[];
   onSelectDate: () => void;
   onRemoveStudent: (studentId: string, date: string) => void;
+  onSelectStudent: (studentId: string) => void;
   isSelected: boolean;
+  selectedStudentId: string | null;
 }) {
   const totalCapacity = slots.reduce((acc, s) => acc + s.capacity, 0);
   const totalOccupancy = slots.reduce((acc, s) => acc + s.assignedStudentIds.length, 0);
@@ -106,7 +110,14 @@ function DateBucket({
       </CardHeader>
       <CardContent className="flex-grow bg-muted/20 rounded-b-lg p-2 space-y-1 overflow-y-auto">
         {students.map(student => (
-          <div key={student.uid} className="group bg-background p-1.5 rounded-md text-xs flex items-center justify-between">
+          <div 
+            key={student.uid} 
+            onClick={(e) => { e.stopPropagation(); onSelectStudent(student.uid); }}
+            className={cn(
+                "group bg-background p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
+                selectedStudentId === student.uid && "ring-2 ring-primary"
+            )}
+          >
             <span className="truncate">{student.name}</span>
             <Button
               variant="ghost"
@@ -132,18 +143,39 @@ function SlotAssignmentPanel({
   allStudents,
   onAssign,
   onUnassign,
+  onSelectStudent,
+  selectedStudentId,
+  selectedDate,
 }: {
   slots: TimeSlot[];
   allStudents: Student[];
   onAssign: (studentId: string, slotId: string) => void;
   onUnassign: (studentId: string, slotId: string) => void;
+  onSelectStudent: (studentId: string) => void;
+  selectedStudentId: string | null;
+  selectedDate: string | null;
 }) {
+
+  const handleSlotClick = (slot: TimeSlot) => {
+    if (selectedStudentId) {
+      onAssign(selectedStudentId, slot.slotId);
+    }
+  }
+
   return (
     <div className="space-y-2">
       {slots.map(slot => {
         const isFull = slot.assignedStudentIds.length >= slot.capacity;
         return (
-          <div key={slot.slotId} className="p-3 border rounded-lg">
+          <div 
+            key={slot.slotId} 
+            className={cn(
+              "p-3 border rounded-lg",
+              selectedStudentId && "cursor-pointer hover:bg-muted/50",
+              isFull && "cursor-not-allowed hover:bg-transparent"
+            )}
+            onClick={() => !isFull && handleSlotClick(slot)}
+          >
             <div className="flex justify-between items-center mb-2">
               <p className="font-semibold">{slot.startTime}</p>
               <p className={cn("text-sm", isFull ? "text-destructive font-bold" : "")}>
@@ -154,13 +186,20 @@ function SlotAssignmentPanel({
               {slot.assignedStudentIds.map(studentId => {
                 const student = allStudents.find(s => s.uid === studentId);
                 return (
-                  <div key={studentId} className="group bg-muted/50 p-1.5 rounded-md text-xs flex items-center justify-between">
+                  <div 
+                    key={studentId} 
+                    onClick={(e) => { e.stopPropagation(); onSelectStudent(studentId); }}
+                    className={cn(
+                        "group bg-muted/50 p-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer",
+                        selectedStudentId === studentId && "ring-2 ring-primary"
+                    )}
+                  >
                     <span className="truncate">{student?.name || '不明'}</span>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                      onClick={() => onUnassign(studentId, slot.slotId)}
+                      onClick={(e) => { e.stopPropagation(); onUnassign(studentId, slot.slotId); }}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -238,30 +277,53 @@ export default function MonthlySchedulerPage() {
   const handleSelectStudent = (studentId: string) => {
     setSelectedStudentId(prev => (prev === studentId ? null : studentId));
   };
-
+  
   const handleSelectDate = (date: string) => {
     if (selectedStudentId) {
-        const student = studentsWithUsage.find(s => s.uid === selectedStudentId);
-        if (!student) return;
-
-        const isAlreadyInDate = allSlots.some(s => s.date === date && s.assignedStudentIds.includes(student.uid));
-        if (isAlreadyInDate) {
-            toast({ title: "注意", description: "この生徒はすでにこの日に割り当てられています。", variant: "default"});
-            return;
-        }
-
-        const { limit } = courseMap[student.course];
-        if (student.usage >= limit) {
-            setStudentToConfirm(student);
-            setAssignmentAction(() => () => assignStudentToFirstAvailableSlot(student.uid, date));
-            return;
-        }
-        assignStudentToFirstAvailableSlot(selectedStudentId, date);
+        assignStudent(selectedStudentId, date);
     } else {
         setSelectedDate(prev => (prev === date ? null : date));
     }
   };
-  
+
+  const assignStudent = async (studentId: string, dateOrSlotId: string) => {
+      const student = studentsWithUsage.find(s => s.uid === studentId);
+      if (!student) return;
+
+      const isSlotId = dateOrSlotId.includes(':');
+      const targetDate = isSlotId ? allSlots.find(s => s.slotId === dateOrSlotId)?.date : dateOrSlotId;
+
+      if (!targetDate) {
+        toast({ title: "エラー", description: "有効な日付またはスロットではありません。", variant: "destructive"});
+        return;
+      }
+      
+      const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+
+      const isSameDate = originalSlot?.date === targetDate;
+      const isNewAssignmentToMonth = !originalSlot;
+      const effectiveUsage = isNewAssignmentToMonth ? student.usage + 1 : student.usage;
+      
+      const { limit } = courseMap[student.course];
+      if (effectiveUsage > limit && !isSameDate) {
+          setStudentToConfirm(student);
+          setAssignmentAction(() => () => {
+              if (isSlotId) {
+                  handleAssignment(studentId, dateOrSlotId, true);
+              } else {
+                  assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+              }
+          });
+          return;
+      }
+
+      if (isSlotId) {
+        await handleAssignment(studentId, dateOrSlotId, true);
+      } else {
+        await assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+      }
+  };
+
   const assignStudentToFirstAvailableSlot = async (studentId: string, date: string) => {
       const dateSlots = allSlots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime));
       const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity);
@@ -284,25 +346,42 @@ export default function MonthlySchedulerPage() {
   
   const handleAssignment = async (studentId: string, slotId: string, assign: boolean) => {
       try {
-          const slot = allSlots.find(s => s.slotId === slotId);
-          if (!slot) throw new Error("Slot not found");
+          const student = allStudents.find(s => s.uid === studentId);
+          if (!student) throw new Error("Student not found");
 
-          let newStudentIds;
+          const targetSlot = allSlots.find(s => s.slotId === slotId);
+          if (!targetSlot) throw new Error("Slot not found");
+
           if (assign) {
-              if (slot.assignedStudentIds.length >= slot.capacity) {
+              if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
                   toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive"});
                   return;
               }
-              newStudentIds = [...slot.assignedStudentIds, studentId];
-          } else {
-              newStudentIds = slot.assignedStudentIds.filter(id => id !== studentId);
+              if (targetSlot.assignedStudentIds.includes(studentId)) {
+                  // Moving within the same day, do nothing here and wait for the un-assignment
+              }
           }
           
-          await updateSlotAssignments(slotId, newStudentIds);
+          // First, remove from old slot if exists in the current month
+          const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+          if (originalSlot && originalSlot.slotId !== targetSlot.slotId) {
+              await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
+          }
+
+          let newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
+          if (assign) {
+            newTargetStudentIds.push(studentId);
+          }
+          
+          await updateSlotAssignments(slotId, newTargetStudentIds);
+          
           await fetchData(currentMonth); // Re-fetch all data to ensure consistency
-          toast({ title: "成功", description: `割り当てを${assign ? '追加' : '削除'}しました。`});
+          toast({ title: "成功", description: `割り当てを更新しました。`});
+
       } catch (error) {
           toast({ title: "エラー", description: "割り当ての更新に失敗しました。", variant: "destructive" });
+      } finally {
+        setSelectedStudentId(null);
       }
   };
 
@@ -311,6 +390,10 @@ export default function MonthlySchedulerPage() {
       if (slot) {
           await handleAssignment(studentId, slot.slotId, false);
       }
+  };
+
+  const handleAssignToSlot = (studentId: string, slotId: string) => {
+    assignStudent(studentId, slotId);
   };
 
   if (loading) return <Loading />;
@@ -367,7 +450,9 @@ export default function MonthlySchedulerPage() {
                     slots={dateSlots}
                     onSelectDate={() => handleSelectDate(date)}
                     onRemoveStudent={handleRemoveStudentFromDate}
+                    onSelectStudent={handleSelectStudent}
                     isSelected={selectedDate === date}
+                    selectedStudentId={selectedStudentId}
                   />
                 );
               })}
@@ -384,8 +469,11 @@ export default function MonthlySchedulerPage() {
               <SlotAssignmentPanel
                 slots={allSlots.filter(s => s.date === selectedDate).sort((a,b) => a.startTime.localeCompare(b.startTime))}
                 allStudents={allStudents}
-                onAssign={(studentId, slotId) => handleAssignment(studentId, slotId, true)}
+                onAssign={handleAssignToSlot}
                 onUnassign={(studentId, slotId) => handleAssignment(studentId, slotId, false)}
+                onSelectStudent={handleSelectStudent}
+                selectedStudentId={selectedStudentId}
+                selectedDate={selectedDate}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground bg-muted/20 rounded-lg">
@@ -414,3 +502,4 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
+
