@@ -189,10 +189,12 @@ function EditSlotDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
             <AlertDialogDescription>
-              以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？
-              <ul className="mt-2 list-disc list-inside">
-                {studentsToConfirm.map(s => <li key={s.uid}>{s.name}</li>)}
-              </ul>
+              <div>
+                <p>以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？</p>
+                <ul className="mt-2 list-disc list-inside">
+                  {studentsToConfirm.map(s => <li key={s.uid}>{s.name}</li>)}
+                </ul>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
