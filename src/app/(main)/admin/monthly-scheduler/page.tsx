@@ -348,41 +348,51 @@ export default function MonthlySchedulerPage() {
 
   const handleAssignment = async (studentId: string, slotId: string, assign: boolean) => {
     try {
-      const student = allStudents.find(s => s.uid === studentId);
-      if (!student) throw new Error("Student not found");
+        const student = allStudents.find(s => s.uid === studentId);
+        if (!student) throw new Error("Student not found");
 
-      const targetSlot = allSlots.find(s => s.slotId === slotId);
-      if (!targetSlot) throw new Error("Slot not found");
-
-      if (assign) {
-        if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
-          toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive" });
-          return;
+        const targetSlot = allSlots.find(s => s.slotId === slotId);
+        if (!targetSlot) throw new Error("Slot not found");
+        
+        if (assign) {
+            if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
+                toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive" });
+                return;
+            }
         }
-      }
+        
+        // Find and remove from the old slot within the current month if it's a move
+        const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+        
+        if (originalSlot && originalSlot.slotId !== slotId) {
+            await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
+        }
 
-      // First, remove from old slot if exists in the current month
-      const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
-      if (originalSlot && originalSlot.slotId !== targetSlot.slotId) {
-        await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
-      }
+        // Determine the new list of students for the target slot
+        let newTargetStudentIds: string[];
+        if (assign) {
+            // Add student if not already present
+            newTargetStudentIds = Array.from(new Set([...targetSlot.assignedStudentIds, studentId]));
+        } else {
+            // Remove student
+            newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
+        }
 
-      let newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
-      if (assign) {
-        newTargetStudentIds.push(studentId);
-      }
+        // Update the target slot only if it's different from the original slot or if it's an unassignment
+        if (!originalSlot || originalSlot.slotId !== slotId || !assign) {
+             await updateSlotAssignments(slotId, newTargetStudentIds);
+        }
 
-      await updateSlotAssignments(slotId, newTargetStudentIds);
-
-      await fetchData(currentMonth); // Re-fetch all data to ensure consistency
-      toast({ title: "成功", description: `割り当てを更新しました。` });
+        await fetchData(currentMonth); // Re-fetch all data to ensure consistency
+        toast({ title: "成功", description: `割り当てを更新しました。` });
 
     } catch (error) {
-      toast({ title: "エラー", description: "割り当ての更新に失敗しました。", variant: "destructive" });
+        const message = error instanceof Error ? error.message : "割り当ての更新に失敗しました。";
+        toast({ title: "エラー", description: message, variant: "destructive" });
     } finally {
-      setSelectedStudentId(null);
+        setSelectedStudentId(null);
     }
-  };
+};
 
   const handleRemoveStudentFromDate = async (studentId: string, date: string) => {
     const slot = allSlots.find(s => s.date === date && s.assignedStudentIds.includes(studentId));
@@ -440,7 +450,7 @@ export default function MonthlySchedulerPage() {
         {/* Zone B: Date Buckets */}
         <div className="md:col-span-2 flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-            <ScrollArea className='flex-1'>
+            <ScrollArea className='flex-1' hideScrollbar>
                 <div className="grid md:grid-cols-2 gap-4 pb-4">
                     {activeDates.map(date => {
                         const dateSlots = allSlots.filter(s => s.date === date);
@@ -507,3 +517,5 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
+
+    
