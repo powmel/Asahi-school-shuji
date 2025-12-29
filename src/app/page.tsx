@@ -24,6 +24,9 @@ export default function Home() {
             // Fallback if user document doesn't exist, maybe redirect to a profile setup page
              router.replace('/student');
           }
+        }).catch(() => {
+            // In case of firestore error, fallback
+            router.replace('/login');
         });
       } else {
         router.replace('/login');
