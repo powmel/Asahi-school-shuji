@@ -1,189 +1,27 @@
 rules_version = '2';
 
-/**
- * Core Philosophy: This ruleset implements a role-based security model for a calligraphy class scheduling application.
- * It distinguishes between two primary roles: Students (standard users) and Admins. Admins have broad read and write
- * privileges across the database for management purposes. Students are granted access based on a strict ownership model,
- * meaning they can only access and manage their own data.
- *
- * Data Structure: The data is organized into a mix of top-level collections for shared or global data, and user-scoped
- * subcollections for private data.
- * - /students/{studentId}: Stores public profiles for each user.
- * - /students/{studentId}/posts/{postId}: A private subcollection for a student's diary entries.
- * - /slots, /lessons, /swapRequests: Top-level collections for managing the scheduling system. Access relies on
- *   denormalized ownership fields (e.g., `studentId`).
- * - /announcements: A top-level collection for read-only content visible to all signed-in users.
- * - /roles_admin: A locked-down collection used to define admin users.
- *
- * Key Security Decisions:
- * - Admin Access: A user is considered an admin if a document with their UID exists in the `/roles_admin` collection.
- *   This collection is not writable by any client to prevent privilege escalation.
- * - Student Access: Students follow the principle of least privilege. They can only create, read, update, and delete
- *   documents directly related to them, enforced either by the document path (e.g., `/students/{studentId}/...`) or
- *   by an internal `studentId` field.
- * - Query Security: Listing documents from collections containing mixed-ownership data (like `lessons` and `swapRequests`)
- *   is restricted to admins to prevent data leakage. Students must query for specific documents they own.
- * - Default Posture: The default rule is to deny access. Permissions are explicitly granted on a per-collection basis.
- *
- * Denormalization for Authorization: To ensure fast and secure authorization checks, ownership data is denormalized.
- * For example, `lessons` and `swapRequests` documents contain a `studentId` field. This allows rules to grant access by
- * inspecting the document itself, avoiding slow and costly `get()` calls to other documents.
- *
- * Structural Segregation: Private user data (diary posts) is stored in a nested subcollection under the user's
- * document (`/students/{studentId}/posts`). This contrasts with shared data like `/slots` or `/announcements` which
- * are at the top level. This separation simplifies rules for list operations, ensuring users can only list documents
- * within their own secure data tree.
- */
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ----------------------------------------------------------------
     // Helper Functions
-    // ----------------------------------------------------------------
-
-    /**
-     * Returns true if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Returns true if the requesting user's UID matches the provided userId.
-     * This is the foundation of the user-ownership model.
-     */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    /**
-     * Checks for admin privileges by verifying the existence of a document
-     * in the locked-down /roles_admin collection.
-     */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    // Matches a single user document.
+    // Users can read/write their own data.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
     }
-
-    /**
-     * Returns true if the requesting user is the owner of an existing document.
-     * Used for secure update and delete operations.
-     */
-    function isExistingDocOwner(docData) {
-      return resource != null && request.auth.uid == docData.studentId;
-    }
-
-    /**
-     * Validates that the studentId field in a new document matches the creator's UID.
-     * Enforces that users can only create documents for themselves.
-     */
-    function isCreatingOwnDocument() {
-      return request.resource.data.studentId == request.auth.uid;
-    }
-
-    // ----------------------------------------------------------------
-    // Collections
-    // ----------------------------------------------------------------
-
-    /**
-     * @description Manages student profile data.
-     * @path /students/{studentId}
-     * @allow (get, update) A student can read or update their own profile.
-     * @deny (update) A student cannot update another student's profile.
-     * @principle Enforces self-service profile management with an admin override. A user can create their own root document.
-     */
-    match /students/{studentId} {
-      allow get: if isOwner(studentId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isOwner(studentId);
-      allow update: if (isOwner(studentId) || isAdmin()) && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages a student's private diary posts.
-     * @path /students/{studentId}/posts/{postId}
-     * @allow (create) A student can create a new post under their own profile.
-     * @deny (list) A student cannot list posts belonging to another student.
-     * @principle Restricts access to a user's own data tree, enforcing both path and data consistency for ownership.
-     */
-    match /students/{studentId}/posts/{postId} {
-      allow get, list: if isOwner(studentId) || isAdmin();
-      allow create: if (isOwner(studentId) || isAdmin()) && request.resource.data.studentId == studentId;
-      allow update: if (isOwner(studentId) || isAdmin()) && resource != null && request.resource.data.studentId == resource.data.studentId;
-      allow delete: if (isOwner(studentId) || isAdmin()) && resource != null;
-    }
-
-    /**
-     * @description Manages available time slots for classes.
-     * @path /slots/{slotId}
-     * @allow (get, list) Any authenticated user can view available slots.
-     * @deny (create, update, delete) Only admins can manage (create, modify, delete) time slots.
-     * @principle Provides public read access for essential app functionality while restricting modifications to trusted admin roles.
-     */
-    match /slots/{slotId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages individual lessons assigned to students.
-     * @path /lessons/{lessonId}
-     * @allow (get) A student can read the details of their own lesson.
-     * @deny (list) A student cannot list all lessons in the system to prevent data leakage.
-     * @deny (create, update) A student cannot create or modify their own lesson; this is an admin action.
-     * @principle Secures documents based on a denormalized 'studentId' field, preventing costly lookups and ensuring query safety.
-     */
-    match /lessons/{lessonId} {
-      allow get: if isAdmin() || isExistingDocOwner(resource.data);
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages student requests to swap lessons.
-     * @path /swapRequests/{swapRequestId}
-     * @allow (create) A student can create a swap request for themselves.
-     * @deny (list) A student cannot list all swap requests in the system.
-     * @deny (update) A student cannot approve their own swap request; this is an admin action.
-     * @principle Allows user-initiated actions (create) while reserving state changes (update) for admins. Enforces ownership on creation.
-     */
-    match /swapRequests/{swapRequestId} {
-      allow get: if isAdmin() || isExistingDocOwner(resource.data);
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && isCreatingOwnDocument();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if (isAdmin() || isExistingDocOwner(resource.data)) && resource != null;
-    }
-
-    /**
-     * @description Manages global announcements.
-     * @path /announcements/{announcementId}
-     * @allow (get, list) Any authenticated user can read published announcements.
-     * @deny (create, update, delete) Only admins can create or manage announcements.
-     * @principle Implements a public read model for published content while securing all write operations for admins.
-     */
-    match /announcements/{announcementId} {
-      allow get: if isAdmin() || (isSignedIn() && resource.data.published == true);
-      allow list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Defines which users have admin privileges.
-     * @path /roles_admin/{userId}
-     * @allow (any) No client is ever allowed to read or write to this collection.
-     * @deny (any) All client-side requests are rejected.
-     * @principle Prevents privilege escalation by making the roles collection inaccessible from the client SDKs. Must be managed via the server-side Admin SDK or Firebase Console.
-     */
-    match /roles_admin/{userId} {
-      allow read: if false;
-      allow write: if false;
+    
+    // Matches diary posts subcollection.
+    // Users can create, read, update, and delete their own posts.
+    match /users/{userId}/posts/{postId} {
+        allow create, read, update, delete: if isOwner(userId);
     }
   }
 }

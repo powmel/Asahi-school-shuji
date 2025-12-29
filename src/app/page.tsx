@@ -2,22 +2,34 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useUser } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 import { Loading } from '@/components/shared/Loading';
 
 export default function Home() {
   const router = useRouter();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
 
   useEffect(() => {
-    if (!loading) {
+    if (!isUserLoading) {
       if (user) {
-        router.replace(isAdmin ? '/admin' : '/student');
+        const userDocRef = doc(firestore, 'users', user.uid);
+        getDoc(userDocRef).then(docSnap => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            router.replace(userData.role === 'admin' ? '/admin' : '/student');
+          } else {
+            // Fallback if user document doesn't exist, maybe redirect to a profile setup page
+             router.replace('/student');
+          }
+        });
       } else {
         router.replace('/login');
       }
     }
-  }, [router, user, isAdmin, loading]);
+  }, [router, user, isUserLoading, firestore]);
 
   return <Loading />;
 }

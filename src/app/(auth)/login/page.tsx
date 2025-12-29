@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,12 +10,14 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Brush } from 'lucide-react';
+import { useAuth, initiateEmailSignIn } from '@/firebase';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -27,23 +28,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      if ((email === 'admin@example.com' || email.startsWith('student')) && password === 'Shodo$123') {
-        await login(email);
-        const isAdmin = email === 'admin@example.com';
-        router.push(isAdmin ? '/admin' : '/student');
-        router.refresh(); // Ensure the page re-renders with new auth state
-      } else {
-        toast({
-          title: 'ログイン失敗',
-          description: 'メールアドレスまたはパスワードが正しくありません。',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-      }
-    } catch (error) {
+      initiateEmailSignIn(auth, email, password);
+      // The onAuthStateChanged listener in FirebaseProvider will handle the redirect
+    } catch (error: any) {
         toast({
             title: 'ログインエラー',
-            description: '予期せぬエラーが発生しました。',
+            description: error.message || '予期せぬエラーが発生しました。',
             variant: 'destructive',
         });
         setIsLoading(false);
@@ -94,9 +84,11 @@ export default function LoginPage() {
                 disabled={isLoading}
               />
             </div>
-            <div className="pt-2 text-xs text-muted-foreground">
-              <p>生徒: student1@example.com / Shodo$123</p>
-              <p>管理者: admin@example.com / Shodo$123</p>
+            <div className="text-center text-sm">
+              アカウントをお持ちでないですか？{' '}
+              <Link href="/signup" className="text-primary underline">
+                サインアップ
+              </Link>
             </div>
           </CardContent>
           <CardFooter>
