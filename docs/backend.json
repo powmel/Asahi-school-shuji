@@ -1,0 +1,367 @@
+{
+  "entities": {
+    "Student": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Student",
+      "type": "object",
+      "description": "Represents a student user in the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Student entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The student's name."
+        },
+        "course": {
+          "type": "string",
+          "description": "The student's course type ('2perMonth' or '3perMonth')."
+        },
+        "email": {
+          "type": "string",
+          "description": "The student's email address.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the student was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "course",
+        "email",
+        "createdAt"
+      ]
+    },
+    "Slot": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Slot",
+      "type": "object",
+      "description": "Represents a time slot for a class.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Slot entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the slot in YYYY-MM-DD format."
+        },
+        "startTime": {
+          "type": "string",
+          "description": "The start time of the slot (e.g., '10:00')."
+        },
+        "endTime": {
+          "type": "string",
+          "description": "The end time of the slot (e.g., '10:50')."
+        },
+        "capacity": {
+          "type": "number",
+          "description": "The maximum number of students allowed in the slot (1-4)."
+        },
+        "assignedStudentIds": {
+          "type": "array",
+          "description": "References to Students. (Relationship: Slot 1:N Student). Array of student IDs assigned to this slot.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "startTime",
+        "endTime",
+        "capacity",
+        "assignedStudentIds"
+      ]
+    },
+    "Lesson": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Lesson",
+      "type": "object",
+      "description": "Represents a lesson assigned to a student in a specific slot.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Lesson entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to Student. (Relationship: Student 1:N Lesson)"
+        },
+        "slotId": {
+          "type": "string",
+          "description": "Reference to Slot. (Relationship: Slot 1:N Lesson)"
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the lesson ('scheduled', 'swap_pending', 'swapped', 'canceled')."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the lesson was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "slotId",
+        "status",
+        "updatedAt"
+      ]
+    },
+    "SwapRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SwapRequest",
+      "type": "object",
+      "description": "Represents a request from a student to swap a lesson.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SwapRequest entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to Student. (Relationship: Student 1:N SwapRequest)"
+        },
+        "fromLessonId": {
+          "type": "string",
+          "description": "Reference to Lesson. (Relationship: Lesson 1:N SwapRequest)"
+        },
+        "preferredDates": {
+          "type": "array",
+          "description": "Array of preferred dates for the swap in YYYY-MM-DD format.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string",
+          "description": "A note from the student regarding the swap request."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the swap request ('pending', 'approved', 'rejected')."
+        },
+        "approvedSlotId": {
+          "type": "string",
+          "description": "Reference to Slot. (Relationship: Slot 1:N SwapRequest). The slot ID that was approved for the swap (optional)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the swap request was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "fromLessonId",
+        "preferredDates",
+        "note",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Announcement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Announcement",
+      "type": "object",
+      "description": "Represents an announcement posted by the admin.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Announcement entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the announcement."
+        },
+        "body": {
+          "type": "string",
+          "description": "The body of the announcement."
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Indicates whether the announcement is published or not."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the announcement was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "body",
+        "published",
+        "createdAt"
+      ]
+    },
+    "Post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Post",
+      "type": "object",
+      "description": "Represents a diary post of a student.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Post entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to Student. (Relationship: Student 1:N Post)"
+        },
+        "content": {
+          "type": "string",
+          "description": "Content of the post"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the post was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "content",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/students/{studentId}",
+        "definition": {
+          "entityName": "Student",
+          "schema": {
+            "$ref": "#/backend/entities/Student"
+          },
+          "description": "Stores student profile information. Accessible to the student themselves and administrators.",
+          "params": [
+            {
+              "name": "studentId",
+              "description": "The unique identifier of the student (same as the Firebase Auth UID)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/slots/{slotId}",
+        "definition": {
+          "entityName": "Slot",
+          "schema": {
+            "$ref": "#/backend/entities/Slot"
+          },
+          "description": "Stores information about available time slots for lessons. Accessible to administrators for management.",
+          "params": [
+            {
+              "name": "slotId",
+              "description": "The unique identifier of the slot."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/lessons/{lessonId}",
+        "definition": {
+          "entityName": "Lesson",
+          "schema": {
+            "$ref": "#/backend/entities/Lesson"
+          },
+          "description": "Stores information about lessons assigned to students. Includes denormalized 'studentId' for authorization independence.",
+          "params": [
+            {
+              "name": "lessonId",
+              "description": "The unique identifier of the lesson."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/swapRequests/{swapRequestId}",
+        "definition": {
+          "entityName": "SwapRequest",
+          "schema": {
+            "$ref": "#/backend/entities/SwapRequest"
+          },
+          "description": "Stores student swap requests. Includes denormalized 'studentId' for authorization independence.",
+          "params": [
+            {
+              "name": "swapRequestId",
+              "description": "The unique identifier of the swap request."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/announcements/{announcementId}",
+        "definition": {
+          "entityName": "Announcement",
+          "schema": {
+            "$ref": "#/backend/entities/Announcement"
+          },
+          "description": "Stores announcements accessible to all logged-in users if 'published' is true. Writable only by admins.",
+          "params": [
+            {
+              "name": "announcementId",
+              "description": "The unique identifier of the announcement."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/students/{studentId}/posts/{postId}",
+        "definition": {
+          "entityName": "Post",
+          "schema": {
+            "$ref": "#/backend/entities/Post"
+          },
+          "description": "Stores diary posts for each student. Only accessible by the owner (student) and admins.",
+          "params": [
+            {
+              "name": "studentId",
+              "description": "The unique identifier of the student."
+            },
+            {
+              "name": "postId",
+              "description": "The unique identifier of the diary post."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "role_admin",
+          "schema": {
+            "$ref": "#/backend/entities/Student"
+          },
+          "description": "Collection to store admin roles. Existence of a document grants admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore structure is designed to support a calligraphy class scheduling application with separate access control for students and administrators. It prioritizes authorization independence and clear security rules, adhering to the defined architectural principles.\n\n**Authorization Independence:**\n\n*   The `lessons` collection includes the `studentId`, enabling rules to verify student ownership without `get()` calls. This allows atomic operations. Similarly, the `swapRequests` also contain `studentId`.\n*   Announcements are segregated into their own collection, and the `published` field is used for filtering, avoiding the need for complex queries or rule logic.\n\n**Structural Segregation:**\n\n*   Students and their associated data (lessons, swap requests) are located under `/users/{userId}`, providing path-based ownership for simplified security rules.\n*   Announcements are stored in a separate `/announcements` collection, suitable for global read access (with `published` flag) and admin write access.\n\n**Access Modeling:**\n\n*   **Path-Based Ownership:** The `/users/{userId}/posts/{postId}` structure enforces that only the user with the matching `userId` can access their posts. This is the primary method for private data.\n*   **Global Roles:** The existence of a document in `/roles_admin/{userId}` grants admin privileges. This avoids custom claims and simplifies rule logic.\n\n**QAPs (Rules are not Filters):**\n\n*   The segregation of data based on access requirements (e.g., private user data under `/users/{userId}` and public announcements in `/announcements`) ensures that list operations are secure. Rules can efficiently filter based on the document's location in the structure, preventing the need to filter based on document content.\n\nThis structure directly addresses the core requirements of the application, enabling secure and efficient data access for both students and administrators while maintaining clear and auditable security rules."
+  }
+}
