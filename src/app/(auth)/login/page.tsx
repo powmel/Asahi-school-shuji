@@ -31,15 +31,14 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
-      // We don't need to explicitly navigate here. The loading state will be handled
-      // by the page transition.
     } catch (error: any) {
         toast({
             title: 'ログインエラー',
             description: error.message || '予期せぬエラーが発生しました。',
             variant: 'destructive',
         });
-        setIsLoading(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 

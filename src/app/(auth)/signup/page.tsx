@@ -65,6 +65,7 @@ export default function SignupPage() {
             description: error.message || '予期せぬエラーが発生しました。',
             variant: 'destructive',
         });
+    } finally {
         setIsLoading(false);
     }
   };
