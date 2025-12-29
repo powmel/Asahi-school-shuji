@@ -22,7 +22,8 @@ export default function Home() {
             router.replace(userData.role === 'admin' ? '/admin' : '/student');
           } else {
             // Fallback if user document doesn't exist, maybe redirect to a profile setup page
-             router.replace('/student');
+            // This can happen if signup process is interrupted after auth creation but before firestore write
+             router.replace('/login');
           }
         }).catch(() => {
             // In case of firestore error, fallback
