@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useFirebase } from "@/firebase";
+import { useUser } from "@/firebase";
 import { Loading } from "@/components/shared/Loading";
 import {
   SidebarProvider,
@@ -16,7 +16,7 @@ type AppLayoutProps = {
 };
 
 export function AppLayout({ sidebar, header, children }: AppLayoutProps) {
-  const { isUserLoading, user } = useFirebase();
+  const { isUserLoading, user } = useUser();
 
   if (isUserLoading || !user) {
     return <Loading />;
@@ -25,10 +25,10 @@ export function AppLayout({ sidebar, header, children }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <Sidebar>{sidebar}</Sidebar>
-      <SidebarInset className="bg-muted/30">
-        <div className="flex h-screen flex-col">
+      <SidebarInset>
+        <div className="flex h-screen flex-col overflow-y-auto">
           {header}
-          <main className="flex-1 flex flex-col min-h-0 p-4 pt-6 md:p-8">
+          <main className="flex-1 p-4 pt-6 md:p-8">
             {children}
           </main>
         </div>

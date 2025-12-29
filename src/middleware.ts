@@ -2,21 +2,22 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const userCookie = request.cookies.get('user');
   const { pathname } = request.nextUrl;
 
-  // Allow requests for login page, API routes, and static files
-  if (pathname.startsWith('/login') || pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.endsWith('.ico')) {
+  // Allow requests for static files and API routes to pass through
+  if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.endsWith('.ico') || pathname.endsWith('.png')) {
     return NextResponse.next();
   }
 
-  // If no user cookie, redirect to login
-  if (!userCookie) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // Allow access to login and signup pages
+  if (pathname.startsWith('/login') || pathname.startsWith('/signup')) {
+    return NextResponse.next();
   }
-
-  // If user is logged in, allow access
+  
+  // To be implemented: check for firebase auth cookie
+  // For now, allow access to other pages for development
   return NextResponse.next();
+
 }
 
 export const config = {
@@ -27,8 +28,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - assets (image files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|assets).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };
