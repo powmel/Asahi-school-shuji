@@ -32,6 +32,7 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
       // A successful login will trigger the logic in `src/app/page.tsx`.
+      router.push('/');
     } catch (error: any) {
         toast({
             title: 'ログインエラー',
