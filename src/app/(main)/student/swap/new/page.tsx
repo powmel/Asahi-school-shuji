@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Suspense } from 'react';
@@ -5,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAuth } from '@/hooks/useAuth';
+import { useUser } from '@/firebase';
 import { createSwapRequest } from '@/lib/data';
 import { Loading } from '@/components/shared/Loading';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -26,7 +27,7 @@ const swapRequestSchema = z.object({
 function SwapRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const lessonId = searchParams.get('lessonId');

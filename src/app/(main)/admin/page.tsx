@@ -1,8 +1,9 @@
+
 "use client";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
+import { useUser } from "@/firebase";
 import { Calendar, Users, Repeat, Megaphone } from "lucide-react";
 import Link from "next/link";
 
@@ -34,13 +35,13 @@ const quickLinks = [
 ];
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user } = useUser();
 
   return (
     <div className="space-y-8">
       <PageHeader title="管理者ダッシュボード" />
       <div className="space-y-4">
-        <h2 className="font-headline text-xl font-semibold">ようこそ、{user?.name || '管理者'}さん</h2>
+        <h2 className="font-headline text-xl font-semibold">ようこそ、{user?.displayName || '管理者'}さん</h2>
         <p className="text-muted-foreground">
           こちらから各管理機能にアクセスできます。
         </p>

@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
+import { useUser } from "@/firebase";
 import { getPublishedAnnouncements, getStudentUpcomingLessons } from "@/lib/data";
 import type { Announcement, LessonWithDetails } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -67,7 +68,7 @@ function UpcomingLessonsSection({ lessons }: { lessons: LessonWithDetails[] }) {
 }
 
 export default function StudentDashboard() {
-  const { user } = useAuth();
+  const { user } = useUser();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [lessons, setLessons] = useState<LessonWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +94,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title={`${user?.name || '生徒'}さんのダッシュボード`} />
+      <PageHeader title={`${user?.displayName || '生徒'}さんのダッシュボード`} />
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

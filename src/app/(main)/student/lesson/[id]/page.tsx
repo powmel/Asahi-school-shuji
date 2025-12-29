@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import { useUser } from '@/firebase';
 import { getLessonDetails } from '@/lib/data';
 import type { LessonWithDetails } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
@@ -19,12 +20,13 @@ const statusMap: { [key in LessonWithDetails['status']]: { text: string, color: 
   swap_pending: { text: '振替申請中', color: 'text-yellow-600' },
   swapped: { text: '振替済み', color: 'text-blue-600' },
   canceled: { text: 'キャンセル済み', color: 'text-red-600' },
+  approved: { text: '承認済み', color: 'text-green-600' },
 };
 
 export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user } = useUser();
   const [lesson, setLesson] = useState<LessonWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

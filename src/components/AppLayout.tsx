@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useAuth } from "@/hooks/useAuth";
+import { useFirebase } from "@/firebase";
 import { Loading } from "@/components/shared/Loading";
 import {
   SidebarProvider,
@@ -16,9 +16,9 @@ type AppLayoutProps = {
 };
 
 export function AppLayout({ sidebar, header, children }: AppLayoutProps) {
-  const { loading, user } = useAuth();
+  const { isUserLoading, user } = useFirebase();
 
-  if (loading || !user) {
+  if (isUserLoading || !user) {
     return <Loading />;
   }
 
