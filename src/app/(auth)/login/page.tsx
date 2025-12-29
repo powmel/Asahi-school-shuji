@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Brush } from 'lucide-react';
-import { useAuth, initiateEmailSignIn } from '@/firebase';
+import { useAuth } from '@/firebase';
 import Link from 'next/link';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,8 +29,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      initiateEmailSignIn(auth, email, password);
-      // The onAuthStateChanged listener in FirebaseProvider will handle the redirect
+      await signInWithEmailAndPassword(auth, email, password);
+      // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
+      // We don't need to explicitly navigate here. The loading state will be handled
+      // by the page transition.
     } catch (error: any) {
         toast({
             title: 'ログインエラー',
