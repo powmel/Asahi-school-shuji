@@ -4,7 +4,7 @@
 // In a real application, you would replace this with actual Firebase SDK calls.
 
 import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
-import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, getYear, getMonth, parseISO } from 'date-fns';
+import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, parseISO } from 'date-fns';
 
 const ADMIN_UID = 'admin@example.com';
 
@@ -146,12 +146,6 @@ const applyPreferredSlots = async () => {
                 if (slot && slot.assignedStudentIds.length < slot.capacity) {
                     const alreadyBooked = lessons.some(l => l.studentId === student.uid && l.slotId === slotId && (l.status === 'approved' || l.status === 'scheduled'));
                     if (alreadyBooked) continue;
-                    
-                    const alreadyBookedInMonth = lessons.some(l => 
-                        l.studentId === student.uid &&
-                        findSlot(l.slotId)?.date.startsWith(monthKey) &&
-                        (l.status === 'approved' || l.status === 'scheduled')
-                    );
                     
                     // Re-check count inside loop to be safe
                     const count = lessons.filter(l => l.studentId === student.uid && findSlot(l.slotId)?.date.startsWith(monthKey) && (l.status === 'approved' || l.status === 'scheduled')).length;
