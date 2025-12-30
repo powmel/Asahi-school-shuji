@@ -42,7 +42,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Counter for student codes, only backend/admin can write.
+    // Counter for student codes, only backend/admin can write. Admin can read.
     match /counters/studentCounter {
         allow read: if isAdmin();
         allow write: if false; // Only backend through admin SDK
