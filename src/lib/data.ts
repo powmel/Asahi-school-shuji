@@ -1,4 +1,5 @@
 
+
 'use client';
 import {
     getFirestore,
@@ -83,9 +84,7 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
     const db = getDb();
     
     try {
-        const newStudentId = doc(collection(db, 'students')).id;
-
-        await runTransaction(db, async (transaction) => {
+        const newStudentId = await runTransaction(db, async (transaction) => {
             const counterRef = doc(db, 'counters', 'studentCounter');
             const counterSnap = await transaction.get(counterRef);
 
@@ -101,15 +100,14 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
             const linkTokenExpiresAt = new Date();
             linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7); // Token valid for 7 days
 
-            const newStudentRef = doc(db, 'students', newStudentId);
+            const newStudentRef = doc(collection(db, 'students'));
 
             transaction.set(newStudentRef, {
                 ...data,
-                uid: newStudentId,
                 studentCode,
                 linkToken,
                 linkTokenExpiresAt: Timestamp.fromDate(linkTokenExpiresAt),
-                isActive: true,
+                isActive: data.isActive ?? true,
                 createdAt: serverTimestamp(),
             });
 
@@ -118,13 +116,16 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
             } else {
                 transaction.update(counterRef, { current: newCount });
             }
+            
+            return newStudentRef.id;
         });
 
         return newStudentId;
 
     } catch (e) {
         console.error("Transaction failed: ", e);
-        throw new Error("生徒の作成に失敗しました。");
+        // Re-throw the original error to be caught by the UI
+        throw e;
     }
 };
 

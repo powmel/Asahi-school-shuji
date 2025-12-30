@@ -201,18 +201,22 @@ function StudentSheet({
             if (isNew) {
                 await createStudent(formData);
                 toast({ title: '成功', description: '新しい生徒が追加されました。コードとトークンが生成されるまで少しお待ちください。'});
-                onOpenChange(false);
-                
+                onOpenChange(false); // Close sheet on success
             } else if(student?.uid) {
                 await updateStudent(student.uid, formData);
                 toast({ title: '成功', description: '生徒情報が更新されました。'});
-                 onStudentUpdate();
-                 onOpenChange(false);
+                onStudentUpdate();
+                onOpenChange(false); // Close sheet on success
             }
-           
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "保存に失敗しました。";
-            toast({ title: '失敗', description: message, variant: 'destructive'});
+        } catch (error: any) {
+            console.error("Save failed:", error);
+            const message = error.code ? `${error.code}: ${error.message}` : (error.message || "保存に失敗しました。");
+            toast({ 
+                title: '失敗', 
+                description: message, 
+                variant: 'destructive',
+                duration: 9000
+            });
         } finally {
             setIsSaving(false);
         }

@@ -39,14 +39,13 @@ service cloud.firestore {
     
     // Students can read their own linked student record. Admins can read/write all.
     match /students/{studentId} {
+      allow create, write: if isAdmin();
       allow read: if isAdmin() || (isLinkedStudent() && studentId == getStudentDocId());
-      allow write: if isAdmin();
     }
     
-    // Counter for student codes, only backend/admin can write. Admin can read.
+    // Counter for student codes, only admin can read/write for the transaction.
     match /counters/studentCounter {
-        allow read: if isAdmin();
-        allow write: if isAdmin(); // Allow admin to write for the transaction
+        allow read, write: if isAdmin();
     }
     
     // Lessons can be read by linked students if it's their lesson, or by any admin.
