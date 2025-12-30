@@ -22,7 +22,7 @@ import { initializeFirebase } from '@/firebase';
 
 
 // This function ensures that Firestore is initialized before we try to use it.
-const getDb = () => {
+export const getDb = () => {
     return getFirestore(initializeFirebase().firebaseApp);
 };
 

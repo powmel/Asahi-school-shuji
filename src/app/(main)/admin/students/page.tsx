@@ -44,12 +44,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent, getDb } from '@/lib/data';
+import { updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent, getDb } from '@/lib/data';
 import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, Timestamp } from 'firebase/firestore';
 
 
 const courseMap: { [key in Student['course']]: {name: string, limit: number} } = {
@@ -198,7 +198,7 @@ function StudentSheet({
         setIsSaving(true);
         try {
             if (isNew) {
-                const newStudent = await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>);
+                const newStudent = await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'studentCode' | 'linkToken' | 'linkTokenExpiresAt' | 'linkedUserId'>);
                 toast({ title: '成功', description: '新しい生徒が追加されました。'});
                 // After creating, keep the sheet open and switch to edit mode
                 onStudentUpdate(); // This will refetch and update the list
@@ -407,7 +407,7 @@ export default function StudentsPage() {
                 studentsData.push({
                     ...data,
                     uid: doc.id,
-                    createdAt: (data.createdAt as any).toDate(),
+                    createdAt: (data.createdAt as Timestamp).toDate(),
                 } as Student);
             });
             setStudents(studentsData.sort((a, b) => (a.createdAt as any) - (b.createdAt as any)));
