@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -45,7 +46,7 @@ service cloud.firestore {
     // Counter for student codes, only backend/admin can write. Admin can read.
     match /counters/studentCounter {
         allow read: if isAdmin();
-        allow write: if false; // Only backend through admin SDK
+        allow write: if isAdmin(); // Allow admin to write for the transaction
     }
     
     // Lessons can be read by linked students if it's their lesson, or by any admin.

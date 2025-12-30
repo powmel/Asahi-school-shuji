@@ -78,24 +78,54 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
     return undefined;
 };
 
-// This function now only creates the basic student document.
-// The studentCode and linkToken will be populated by a Cloud Function trigger.
-export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'createdAt'>>): Promise<Document> => {
+// This function now handles code and token generation directly.
+export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'createdAt'>>): Promise<string> => {
     const db = getDb();
-    const newStudentRef = doc(collection(db, 'students'));
+    
+    try {
+        const newStudentId = doc(collection(db, 'students')).id;
 
-    const newStudentData = {
-        ...data,
-        isActive: true, // Default to active
-        createdAt: serverTimestamp(),
-        // studentCode and linkToken are omitted, to be added by backend.
-    };
+        await runTransaction(db, async (transaction) => {
+            const counterRef = doc(db, 'counters', 'studentCounter');
+            const counterSnap = await transaction.get(counterRef);
 
-    await setDoc(newStudentRef, newStudentData);
+            let newCount;
+            if (!counterSnap.exists()) {
+                newCount = 1;
+            } else {
+                newCount = counterSnap.data().current + 1;
+            }
 
-    // Return the document reference, as the full student data is now incomplete
-    // until the function populates it. The UI will get the full data from the real-time listener.
-    return newStudentRef as any;
+            const studentCode = `@121${String(newCount).padStart(4, '0')}`;
+            const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
+            const linkTokenExpiresAt = new Date();
+            linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7); // Token valid for 7 days
+
+            const newStudentRef = doc(db, 'students', newStudentId);
+
+            transaction.set(newStudentRef, {
+                ...data,
+                uid: newStudentId,
+                studentCode,
+                linkToken,
+                linkTokenExpiresAt: Timestamp.fromDate(linkTokenExpiresAt),
+                isActive: true,
+                createdAt: serverTimestamp(),
+            });
+
+            if (!counterSnap.exists()) {
+                transaction.set(counterRef, { current: newCount });
+            } else {
+                transaction.update(counterRef, { current: newCount });
+            }
+        });
+
+        return newStudentId;
+
+    } catch (e) {
+        console.error("Transaction failed: ", e);
+        throw new Error("生徒の作成に失敗しました。");
+    }
 };
 
 export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<void> => {
@@ -274,9 +304,6 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     await runTransaction(db, async (transaction) => {
         const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
         
-        // This 'get' is outside the transaction to fetch existing documents.
-        // Note: This is a simplification. A more robust implementation might need
-        // to handle read-after-write consistency issues. For this app's scale, it's acceptable.
         const currentLessonsSnap = await getDocs(lessonsQuery);
         
         const currentStudentIds = new Set(currentLessonsSnap.docs.map(doc => doc.data().studentId));
