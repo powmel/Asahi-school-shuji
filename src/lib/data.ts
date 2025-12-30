@@ -259,7 +259,7 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     return new Promise(resolve => {
         setTimeout(() => {
             const monthStr = format(month, 'yyyy-MM');
-            resolve(slots.filter(s => s.date.startsWith(monthStr)));
+            resolve(JSON.parse(JSON.stringify(slots.filter(s => s.date.startsWith(monthStr)))));
         }, FAKE_DELAY);
     });
 }
@@ -267,7 +267,7 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
 export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
     return new Promise(resolve => {
         setTimeout(() => {
-            resolve(slots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime)));
+            resolve(JSON.parse(JSON.stringify(slots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime)))));
         }, FAKE_DELAY);
     });
 }
@@ -345,9 +345,11 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
 
             // If slot doesn't exist, create it.
             if (!slot) {
-                const [date, startTime] = slotId.split('-');
+                const date = slotId.substring(0, 10); // "YYYY-MM-DD"
+                const startTime = slotId.substring(11); // "HH:mm"
+                
                 const timeDef = fixedTimeSlotsDefinition.find(t => t.startTime === startTime);
-                if (!date || !timeDef) {
+                if (!date.match(/^\d{4}-\d{2}-\d{2}$/) || !timeDef) {
                     return reject(new Error("Invalid slotId format."));
                 }
                 const newSlot: TimeSlot = {
@@ -393,7 +395,7 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
             });
 
             slot.assignedStudentIds = studentIds;
-            resolve(slot);
+            resolve(JSON.parse(JSON.stringify(slot)));
         }, FAKE_DELAY);
     });
 };

@@ -71,7 +71,7 @@ export function EditSlotDialog({
   }, [slot]);
 
   useEffect(() => {
-    if (open && allStudents.length > 0) {
+    if (open && allStudents.length > 0 && slot) {
       const fetchCounts = async () => {
         const counts: Record<string, number> = {};
         const promises = allStudents.map(student =>
@@ -84,7 +84,7 @@ export function EditSlotDialog({
       };
       fetchCounts();
     }
-  }, [open, allStudents, currentMonth]);
+  }, [open, allStudents, currentMonth, slot]);
 
   const handleAttemptSave = () => {
     if (!slot) return;
@@ -93,10 +93,8 @@ export function EditSlotDialog({
       .map(id => allStudents.find(s => s.uid === id))
       .filter((student): student is Student => {
         if (!student) return false;
-        const currentCount = studentMonthlyCounts[student.uid] ?? 0;
+        const projectedCount = getProjectedCount(student);
         const limit = courseMap[student.course].limit;
-        const isNewAssignment = !slot.assignedStudentIds.includes(student.uid);
-        const projectedCount = isNewAssignment ? currentCount + 1 : currentCount;
         return projectedCount > limit;
       });
 
