@@ -280,6 +280,25 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
     });
 };
 
+export const createStudent = async (data: Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>): Promise<Student> => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (!data.name || !data.email || !data.course) {
+                return reject(new Error("Missing required fields."));
+            }
+            const newStudent: Student = {
+                uid: `student${students.length + 1}`,
+                createdAt: new Date(),
+                isActive: true,
+                preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' },
+                ...data
+            };
+            students.push(newStudent);
+            resolve(newStudent);
+        }, FAKE_DELAY);
+    });
+}
+
 export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<Student> => {
     return new Promise((resolve, reject) => {
         setTimeout(async () => {
@@ -345,8 +364,11 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
 
             // If slot doesn't exist, create it.
             if (!slot) {
-                const date = slotId.substring(0, 10); // "YYYY-MM-DD"
-                const startTime = slotId.substring(11); // "HH:mm"
+                const dateParts = slotId.split('-');
+                if (dateParts.length < 4) return reject(new Error("Invalid slotId format."));
+                
+                const date = dateParts.slice(0, 3).join('-'); // "YYYY-MM-DD"
+                const startTime = dateParts.slice(3).join(':'); // "HH:mm"
                 
                 const timeDef = fixedTimeSlotsDefinition.find(t => t.startTime === startTime);
                 if (!date.match(/^\d{4}-\d{2}-\d{2}$/) || !timeDef) {

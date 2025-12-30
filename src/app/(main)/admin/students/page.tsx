@@ -44,7 +44,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth } from '@/lib/data';
+import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent } from '@/lib/data';
 import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
@@ -134,14 +134,14 @@ function PreferredSlotDialog({
     );
 }
 
-function StudentEditSheet({ 
+function StudentSheet({ 
     student, 
     open, 
     onOpenChange,
     onStudentUpdate,
     currentMonth
 }: { 
-    student: Student | null, 
+    student: Partial<Student> | null, 
     open: boolean, 
     onOpenChange: (open: boolean) => void,
     onStudentUpdate: () => void,
@@ -154,14 +154,20 @@ function StudentEditSheet({
     const [monthlyCount, setMonthlyCount] = useState<number | null>(null);
     const { toast } = useToast();
 
+    const isNew = !student || !student.uid;
+
     useEffect(() => {
         if (student) {
             setFormData(student);
-            countStudentLessonsInMonth(student.uid, currentMonth)
-                .then(setMonthlyCount);
+            if (student.uid) {
+                countStudentLessonsInMonth(student.uid, currentMonth)
+                    .then(setMonthlyCount);
+            } else {
+                 setMonthlyCount(0);
+            }
         } else {
             setFormData({ name: '', email: '', course: '2perMonth', isActive: true, preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } });
-            setMonthlyCount(null);
+            setMonthlyCount(0);
         }
     }, [student, currentMonth]);
 
@@ -170,22 +176,27 @@ function StudentEditSheet({
     }
 
     const handleSave = async () => {
-        if (!student) return;
         setIsSaving(true);
         try {
-            await updateStudent(student.uid, formData);
-            toast({ title: '成功', description: '生徒情報が更新されました。'});
+            if (isNew) {
+                await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>);
+                toast({ title: '成功', description: '新しい生徒が追加されました。'});
+            } else if(student?.uid) {
+                await updateStudent(student.uid, formData);
+                toast({ title: '成功', description: '生徒情報が更新されました。'});
+            }
             onStudentUpdate();
             onOpenChange(false);
         } catch (error) {
-            toast({ title: '失敗', description: '更新に失敗しました。', variant: 'destructive'});
+            const message = error instanceof Error ? error.message : "保存に失敗しました。";
+            toast({ title: '失敗', description: message, variant: 'destructive'});
         } finally {
             setIsSaving(false);
         }
     };
     
     const handleDelete = async () => {
-        if (!student) return;
+        if (!student || !student.uid) return;
         try {
             await deleteStudent(student.uid);
             toast({ title: '成功', description: '生徒が削除されました。'});
@@ -199,35 +210,37 @@ function StudentEditSheet({
     
     if (!student) return null;
 
-    const currentPlan = courseMap[student.course];
+    const currentPlan = courseMap[formData.course || '2perMonth'];
 
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
                 <SheetContent className="sm:max-w-lg overflow-y-auto">
                     <SheetHeader>
-                        <SheetTitle>{student.name}</SheetTitle>
-                        <SheetDescription>生徒の詳細情報を確認・編集します。</SheetDescription>
+                        <SheetTitle>{isNew ? "新規生徒追加" : student.name}</SheetTitle>
+                        <SheetDescription>{isNew ? "新しい生徒の詳細情報を入力してください。" : "生徒の詳細情報を確認・編集します。"}</SheetDescription>
                     </SheetHeader>
                     <div className="space-y-6 py-6">
-                        <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
-                            <div>
-                                <p className="text-sm text-muted-foreground">{format(currentMonth, 'M月')}のレッスン回数</p>
-                                <p className="text-2xl font-bold">
-                                    {monthlyCount !== null ? `${monthlyCount} / ${currentPlan.limit}` : '読込中...'}
-                                </p>
+                        {!isNew && (
+                            <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">{format(currentMonth, 'M月')}のレッスン回数</p>
+                                    <p className="text-2xl font-bold">
+                                        {monthlyCount !== null ? `${monthlyCount} / ${currentPlan.limit}` : '読込中...'}
+                                    </p>
+                                </div>
+                                <Badge variant={formData.isActive ? 'default' : 'secondary'}>
+                                    {formData.isActive ? '在籍中' : '休会中'}
+                                </Badge>
                             </div>
-                            <Badge variant={formData.isActive ? 'default' : 'secondary'}>
-                                {formData.isActive ? '在籍中' : '休会中'}
-                            </Badge>
-                        </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
+                            <div className="space-y-2 col-span-2">
                                 <Label htmlFor="name">名前</Label>
                                 <Input id="name" value={formData.name || ''} onChange={e => handleFieldChange('name', e.target.value)} />
                             </div>
-                            <div className="space-y-2">
+                             <div className="space-y-2 col-span-2">
                                 <Label htmlFor="email">メールアドレス</Label>
                                 <Input id="email" type="email" value={formData.email || ''} onChange={e => handleFieldChange('email', e.target.value)} />
                             </div>
@@ -281,27 +294,31 @@ function StudentEditSheet({
 
                     </div>
                     <SheetFooter className="grid grid-cols-2 gap-2 sm:flex">
-                        <Button variant="outline" onClick={() => setIsPrefDialogOpen(true)}>
-                            <Clock className="mr-2 h-4 w-4"/>
-                            時間指定
-                        </Button>
-                        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                           <AlertDialogTrigger asChild>
-                             <Button variant="destructive">削除</Button>
-                           </AlertDialogTrigger>
-                           <AlertDialogContent>
-                               <AlertDialogHeader>
-                                   <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                                   <AlertDialogDescription>
-                                      「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
-                                   </AlertDialogDescription>
-                               </AlertDialogHeader>
-                               <AlertDialogFooter>
-                                   <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                                   <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
-                               </AlertDialogFooter>
-                           </AlertDialogContent>
-                        </AlertDialog>
+                        {!isNew && (
+                            <>
+                            <Button variant="outline" onClick={() => setIsPrefDialogOpen(true)}>
+                                <Clock className="mr-2 h-4 w-4"/>
+                                時間指定
+                            </Button>
+                            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                               <AlertDialogTrigger asChild>
+                                 <Button variant="destructive">削除</Button>
+                               </AlertDialogTrigger>
+                               <AlertDialogContent>
+                                   <AlertDialogHeader>
+                                       <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                                       <AlertDialogDescription>
+                                          「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
+                                       </AlertDialogDescription>
+                                   </AlertDialogHeader>
+                                   <AlertDialogFooter>
+                                       <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                       <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
+                                   </AlertDialogFooter>
+                               </AlertDialogContent>
+                            </AlertDialog>
+                            </>
+                        )}
                         <div className="hidden sm:flex-grow" />
                         <SheetClose asChild>
                             <Button variant="outline">キャンセル</Button>
@@ -313,9 +330,9 @@ function StudentEditSheet({
                 </SheetContent>
             </Sheet>
 
-            { isPrefDialogOpen && 
+            { !isNew && isPrefDialogOpen && 
                 <PreferredSlotDialog 
-                    student={student}
+                    student={student as Student}
                     open={isPrefDialogOpen}
                     onOpenChange={setIsPrefDialogOpen}
                     onStudentUpdate={onStudentUpdate}
@@ -328,9 +345,10 @@ function StudentEditSheet({
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Partial<Student> | null>(null);
   const [monthlyCounts, setMonthlyCounts] = useState<Record<string, number>>({});
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const fetchStudents = async (month: Date) => {
     setLoading(true);
@@ -362,6 +380,12 @@ export default function StudentsPage() {
   
   const handleStudentSelect = (student: Student) => {
     setSelectedStudent(student);
+    setIsSheetOpen(true);
+  }
+  
+  const handleNewStudent = () => {
+      setSelectedStudent({ name: '', email: '', course: '2perMonth', isActive: true, preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } });
+      setIsSheetOpen(true);
   }
 
   const onStudentUpdate = () => {
@@ -381,7 +405,7 @@ export default function StudentsPage() {
             <Button variant="outline" onClick={() => handleMonthChange('prev')}>&lt;</Button>
             <span className="w-28 text-center font-semibold">{format(currentMonth, 'yyyy年 M月')}</span>
             <Button variant="outline" onClick={() => handleMonthChange('next')}>&gt;</Button>
-            <Button disabled>新規生徒追加</Button>
+            <Button onClick={handleNewStudent}>新規生徒追加</Button>
         </div>
       </PageHeader>
       <div className="rounded-lg border bg-card">
@@ -443,8 +467,7 @@ export default function StudentsPage() {
                                <AlertDialogFooter>
                                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
                                    <AlertDialogAction onClick={() => {
-                                       handleDelete();
-                                       setSelectedStudent(null);
+                                       if(student?.uid) handleDelete(student.uid);
                                    }} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
                                </AlertDialogFooter>
                            </AlertDialogContent>
@@ -462,21 +485,26 @@ export default function StudentsPage() {
         </Table>
       </div>
       
-      <StudentEditSheet 
+      <StudentSheet 
         student={selectedStudent} 
-        open={!!selectedStudent}
-        onOpenChange={(isOpen) => !isOpen && setSelectedStudent(null)}
+        open={isSheetOpen}
+        onOpenChange={(isOpen) => {
+            if(!isOpen) setSelectedStudent(null);
+            setIsSheetOpen(isOpen);
+        }}
         onStudentUpdate={onStudentUpdate}
         currentMonth={currentMonth}
       />
     </div>
   );
-  async function handleDelete() {
-      if (!selectedStudent) return;
+  async function handleDelete(studentId: string) {
+      if (!studentId) return;
       try {
-          await deleteStudent(selectedStudent.uid);
+          await deleteStudent(studentId);
           toast({ title: '成功', description: '生徒が削除されました。'});
           onStudentUpdate();
+          setIsSheetOpen(false);
+          setSelectedStudent(null);
       } catch (error) {
           toast({ title: '失敗', description: '削除に失敗しました。', variant: 'destructive'});
       }
