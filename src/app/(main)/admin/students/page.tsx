@@ -340,7 +340,7 @@ function StudentSheet({
                                    <AlertDialogHeader>
                                        <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
                                        <AlertDialogDescription>
-                                          「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
+                                          <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
                                        </AlertDialogDescription>
                                    </AlertDialogHeader>
                                    <AlertDialogFooter>
@@ -519,7 +519,7 @@ export default function StudentsPage() {
                                <AlertDialogHeader>
                                    <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
                                    <AlertDialogDescription>
-                                      「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。
+                                      <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
                                    </AlertDialogDescription>
                                </AlertDialogHeader>
                                <AlertDialogFooter>
@@ -557,3 +557,5 @@ export default function StudentsPage() {
   );
 }
 
+
+    
