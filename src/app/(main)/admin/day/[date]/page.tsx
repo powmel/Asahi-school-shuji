@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, useMemo } from 'react';
@@ -6,14 +7,16 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loading } from '@/components/shared/Loading';
-import { getSlotsForDay, getAllStudents, fixedTimeSlotsDefinition } from '@/lib/data';
+import { getSlotsForDay, getAllStudents, fixedTimeSlotsDefinition, updateSlotAssignments } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { format, parseISO, isSaturday, isSunday, addDays, subDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { EditSlotDialog } from '@/app/(main)/admin/schedule/page';
+import { useToast } from '@/hooks/use-toast';
+
 
 const courseMap: { [key in Student['course']]: string } = {
   '2perMonth': '月2',
@@ -34,29 +37,50 @@ export default function DayDetailPage() {
   const params = useParams();
   const router = useRouter();
   const date = params.date as string;
+  const { toast } = useToast();
 
   const [slots, setSlots] = useState<TimeSlot[]>([]);
-  const [students, setStudents] = useState<Record<string, Student>>({});
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
 
   const currentDate = useMemo(() => parseISO(date), [date]);
+  const currentMonth = useMemo(() => new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), [currentDate]);
+
+  const fetchData = () => {
+    if (date) {
+        setLoading(true);
+        Promise.all([
+            getSlotsForDay(date),
+            getAllStudents(),
+        ]).then(([slotsData, studentsData]) => {
+            
+            // Ensure slots exist for all fixed time definitions
+            const existingSlotTimes = new Set(slotsData.map(s => s.startTime));
+            const allPossibleSlots = fixedTimeSlotsDefinition.map(timeDef => {
+                const existingSlot = slotsData.find(s => s.startTime === timeDef.startTime);
+                if (existingSlot) {
+                    return existingSlot;
+                }
+                return {
+                    slotId: `${date}-${timeDef.startTime}`,
+                    date: date,
+                    startTime: timeDef.startTime,
+                    endTime: timeDef.endTime,
+                    capacity: 4, // Default capacity
+                    assignedStudentIds: [],
+                };
+            });
+
+            setSlots(allPossibleSlots);
+            setAllStudents(studentsData);
+            setLoading(false);
+        });
+    }
+  }
 
   useEffect(() => {
-    if (date) {
-      setLoading(true);
-      Promise.all([
-        getSlotsForDay(date),
-        getAllStudents().then(studentList => {
-          const studentMap: Record<string, Student> = {};
-          studentList.forEach(s => studentMap[s.uid] = s);
-          return studentMap;
-        }),
-      ]).then(([slotsData, studentMap]) => {
-        setSlots(slotsData);
-        setStudents(studentMap);
-        setLoading(false);
-      });
-    }
+    fetchData();
   }, [date]);
   
   const handleTodayClick = () => {
@@ -72,6 +96,17 @@ export default function DayDetailPage() {
       }
       router.push(`/admin/day/${format(dayToFind, 'yyyy-MM-dd')}`);
   }
+  
+  const handleSlotSave = async (slotId: string, studentIds: string[]) => {
+    try {
+        await updateSlotAssignments(slotId, studentIds);
+        toast({ title: "成功", description: "スロットが更新されました。" });
+        fetchData();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "更新に失敗しました。";
+        toast({ title: "エラー", description: message, variant: "destructive" });
+    }
+  };
 
 
   if (loading) return <Loading />;
@@ -92,33 +127,36 @@ export default function DayDetailPage() {
       </PageHeader>
 
       <div className="space-y-4">
-        {fixedTimeSlotsDefinition.map(timeDef => {
-          const slot = slots.find(s => s.startTime === timeDef.startTime);
-          const occupancy = slot ? slot.assignedStudentIds.length : 0;
-          const capacity = slot ? slot.capacity : fixedTimeSlotsDefinition.length > 0 ? DEFAULT_SLOT_CAPACITY : 0;
-          const isFull = slot ? occupancy >= slot.capacity : false;
+        {slots.map(slot => {
+          const occupancy = slot.assignedStudentIds.length;
+          const capacity = slot.capacity;
+          const isFull = occupancy >= capacity;
 
           return (
-            <Card key={timeDef.startTime}>
+            <Card key={slot.slotId}>
               <CardHeader className="pb-4">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="font-headline text-xl">{timeDef.startTime} - {timeDef.endTime}</CardTitle>
-                  <div>
-                    <span className={cn('mr-4', isFull ? 'text-destructive font-bold' : '')}>{isFull ? '満席' : `残り${capacity - occupancy}`}</span>
+                  <CardTitle className="font-headline text-xl">{slot.startTime} - {slot.endTime}</CardTitle>
+                  <div className="flex items-center gap-4">
+                    <span className={cn('font-semibold', isFull ? 'text-destructive' : '')}>{isFull ? '満席' : `残り${capacity - occupancy}`}</span>
                     <span className="text-muted-foreground">{occupancy} / {capacity}人</span>
+                     <Button variant="outline" size="sm" onClick={() => setEditingSlot(slot)}>
+                        <UserPlus className="mr-2 h-4 w-4"/>
+                        生徒を割り当て
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {slot && slot.assignedStudentIds.length > 0 ? (
+                {slot.assignedStudentIds.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {slot.assignedStudentIds.map(studentId => {
-                      const student = students[studentId];
+                      const student = allStudents.find(s => s.uid === studentId);
                       return student ? (
                         <div key={studentId} className="p-3 bg-muted/50 rounded-lg flex justify-between items-center">
                           <div>
                             <p className="font-semibold">{student.name}</p>
-                            <p className="text-sm text-muted-foreground">{student.displayTag}</p>
+                            {student.displayTag && <p className="text-sm text-muted-foreground">{student.displayTag}</p>}
                           </div>
                           <Badge variant="outline">{courseMap[student.course]}</Badge>
                         </div>
@@ -134,14 +172,16 @@ export default function DayDetailPage() {
             </Card>
           );
         })}
-        {!slots.length && (
-            <div className="text-center text-muted-foreground py-16">
-                <p>この日の授業スロットはありません。</p>
-            </div>
-        )}
       </div>
+      
+       <EditSlotDialog
+          open={!!editingSlot}
+          onOpenChange={(isOpen) => !isOpen && setEditingSlot(null)}
+          slot={editingSlot}
+          allStudents={allStudents}
+          onSave={handleSlotSave}
+          currentMonth={currentMonth}
+        />
     </div>
   );
 }
-
-const DEFAULT_SLOT_CAPACITY = 4;

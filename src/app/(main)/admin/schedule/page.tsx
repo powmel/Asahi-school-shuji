@@ -43,7 +43,7 @@ const courseMap: { [key in Student['course']]: { name: string; limit: number } }
 };
 
 
-function EditSlotDialog({
+export function EditSlotDialog({
   open,
   onOpenChange,
   slot,
@@ -153,7 +153,7 @@ function EditSlotDialog({
                 <div key={student.uid} className="flex items-center justify-between space-x-2 pr-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id={`student-${student.uid}`}
+                      id={`student-${student.uid}-${slot?.slotId}`}
                       checked={selectedStudentIds.includes(student.uid)}
                       onCheckedChange={(checked) => {
                         setSelectedStudentIds(prev =>
@@ -161,7 +161,7 @@ function EditSlotDialog({
                         );
                       }}
                     />
-                    <Label htmlFor={`student-${student.uid}`} className="flex items-center gap-2">
+                    <Label htmlFor={`student-${student.uid}-${slot?.slotId}`} className="flex items-center gap-2">
                       {isPreferredSlot && <Star className="h-4 w-4 text-yellow-500 fill-yellow-400" />}
                       <span>{student.name}</span>
                       <Badge variant="outline" className="font-normal">{courseMap[student.course].name}</Badge>
@@ -324,7 +324,30 @@ export default function SchedulePage() {
                       }
                       
                       const slot = daySlots.find(s => s.startTime === timeDef.startTime);
-                      if (!slot) return <div key={timeDef.startTime} className="h-24 border-b p-2 text-xs text-muted-foreground flex items-center justify-center">データなし</div>
+                      if (!slot) {
+                          const mockSlot: TimeSlot = {
+                              slotId: `${dayString}-${timeDef.startTime}`,
+                              date: dayString,
+                              startTime: timeDef.startTime,
+                              endTime: timeDef.endTime,
+                              capacity: 4,
+                              assignedStudentIds: [],
+                          };
+                          return (
+                             <div key={mockSlot.slotId} className={cn("h-24 border-b p-2 text-xs relative group")}>
+                                <p className="font-semibold">{mockSlot.startTime}</p>
+                                <div className="text-sm">残{mockSlot.capacity}</div>
+                                <p className="text-muted-foreground">0/{mockSlot.capacity}人</p>
+                                <Button
+                                    variant="ghost" size="icon"
+                                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => setEditingSlot(mockSlot)}
+                                >
+                                    <UserPlus className="h-4 w-4" />
+                                </Button>
+                             </div>
+                          )
+                      }
                       
                       const occupancy = slot.assignedStudentIds.length;
                       const capacity = slot.capacity;
