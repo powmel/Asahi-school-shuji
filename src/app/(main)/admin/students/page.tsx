@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, FilePenLine, Trash2, Clock } from 'lucide-react';
+import { MoreHorizontal, FilePenLine, Trash2, Clock, Copy, Check, UserPlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,17 +44,36 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent } from '@/lib/data';
+import { getAllStudents, updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent, getDb } from '@/lib/data';
 import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 
 const courseMap: { [key in Student['course']]: {name: string, limit: number} } = {
   '2perMonth': { name: '月2回コース', limit: 2 },
   '3perMonth': { name: '月3回コース', limit: 3 },
 };
+
+function CopyToClipboard({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    const { toast } = useToast();
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        toast({ title: "コピーしました", description: text });
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <Button variant="ghost" size="sm" onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+        </Button>
+    );
+}
 
 function PreferredSlotDialog({
     student,
@@ -179,14 +198,19 @@ function StudentSheet({
         setIsSaving(true);
         try {
             if (isNew) {
-                await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>);
+                const newStudent = await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>);
                 toast({ title: '成功', description: '新しい生徒が追加されました。'});
+                // After creating, keep the sheet open and switch to edit mode
+                onStudentUpdate(); // This will refetch and update the list
+                onOpenChange(false); // Close the sheet after creation
+                
             } else if(student?.uid) {
                 await updateStudent(student.uid, formData);
                 toast({ title: '成功', description: '生徒情報が更新されました。'});
+                 onStudentUpdate();
+                 onOpenChange(false);
             }
-            onStudentUpdate();
-            onOpenChange(false);
+           
         } catch (error) {
             const message = error instanceof Error ? error.message : "保存に失敗しました。";
             toast({ title: '失敗', description: message, variant: 'destructive'});
@@ -222,19 +246,28 @@ function StudentSheet({
                     </SheetHeader>
                     <div className="space-y-6 py-6">
                         {!isNew && (
-                            <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">{format(currentMonth, 'M月')}のレッスン回数</p>
-                                    <p className="text-2xl font-bold">
-                                        {monthlyCount !== null ? `${monthlyCount} / ${currentPlan.limit}` : '読込中...'}
-                                    </p>
+                             <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                               <h3 className="font-semibold text-sm">アカウント連携情報</h3>
+                                <div className="space-y-2">
+                                    <Label>生徒コード</Label>
+                                    <div className="flex items-center">
+                                        <Input readOnly value={formData.studentCode || ''} className="bg-muted"/>
+                                        <CopyToClipboard text={formData.studentCode || ''} />
+                                    </div>
                                 </div>
-                                <Badge variant={formData.isActive ? 'default' : 'secondary'}>
-                                    {formData.isActive ? '在籍中' : '休会中'}
-                                </Badge>
+                                <div className="space-y-2">
+                                    <Label>連携トークン</Label>
+                                    <div className="flex items-center">
+                                        <Input readOnly value={formData.linkToken || '発行されていません'} className="bg-muted" />
+                                        {formData.linkToken && <CopyToClipboard text={formData.linkToken} />}
+                                    </div>
+                                    {formData.linkTokenExpiresAt && <p className="text-xs text-muted-foreground">有効期限: {format((formData.linkTokenExpiresAt as any).toDate(), 'yyyy/MM/dd HH:mm')}</p>}
+                                </div>
+                                 <p className="text-xs text-muted-foreground">
+                                    {formData.linkedUserId ? `連携済み (ユーザーID: ${formData.linkedUserId.substring(0,10)}...)` : '未連携'}
+                                </p>
                             </div>
                         )}
-
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2 col-span-2">
                                 <Label htmlFor="name">名前</Label>
@@ -330,7 +363,7 @@ function StudentSheet({
                 </SheetContent>
             </Sheet>
 
-            { !isNew && isPrefDialogOpen && 
+            { !isNew && isPrefDialogOpen && student.uid &&
                 <PreferredSlotDialog 
                     student={student as Student}
                     open={isPrefDialogOpen}
@@ -349,19 +382,7 @@ export default function StudentsPage() {
   const [monthlyCounts, setMonthlyCounts] = useState<Record<string, number>>({});
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-  const fetchStudents = async (month: Date) => {
-    setLoading(true);
-    try {
-        const data = await getAllStudents();
-        setStudents(data);
-        await fetchMonthlyCounts(data, month);
-    } catch (e) {
-        // handle error
-    } finally {
-        setLoading(false);
-    }
-  };
+  const { toast } = useToast();
 
   const fetchMonthlyCounts = async (studentList: Student[], month: Date) => {
       const counts: Record<string, number> = {};
@@ -374,9 +395,32 @@ export default function StudentsPage() {
       setMonthlyCounts(counts);
   }
 
-  useEffect(() => {
-    fetchStudents(currentMonth);
-  }, [currentMonth]);
+    useEffect(() => {
+        setLoading(true);
+        const db = getDb();
+        const q = query(collection(db, 'students'));
+        
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const studentsData: Student[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                studentsData.push({
+                    ...data,
+                    uid: doc.id,
+                    createdAt: (data.createdAt as any).toDate(),
+                } as Student);
+            });
+            setStudents(studentsData.sort((a, b) => (a.createdAt as any) - (b.createdAt as any)));
+            fetchMonthlyCounts(studentsData, currentMonth);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching students: ", error);
+            toast({ title: 'エラー', description: '生徒情報の取得に失敗しました。', variant: 'destructive'});
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [currentMonth, toast]);
   
   const handleStudentSelect = (student: Student) => {
     setSelectedStudent(student);
@@ -389,7 +433,7 @@ export default function StudentsPage() {
   }
 
   const onStudentUpdate = () => {
-      fetchStudents(currentMonth);
+      // Real-time listener will handle the update
   }
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
@@ -405,7 +449,7 @@ export default function StudentsPage() {
             <Button variant="outline" onClick={() => handleMonthChange('prev')}>&lt;</Button>
             <span className="w-28 text-center font-semibold">{format(currentMonth, 'yyyy年 M月')}</span>
             <Button variant="outline" onClick={() => handleMonthChange('next')}>&gt;</Button>
-            <Button onClick={handleNewStudent}>新規生徒追加</Button>
+            <Button onClick={handleNewStudent}><UserPlus className="mr-2 h-4 w-4"/>新規生徒追加</Button>
         </div>
       </PageHeader>
       <div className="rounded-lg border bg-card">
@@ -413,10 +457,10 @@ export default function StudentsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>名前</TableHead>
+              <TableHead>生徒コード</TableHead>
               <TableHead>コース</TableHead>
               <TableHead>レッスン回数</TableHead>
               <TableHead>ステータス</TableHead>
-              <TableHead>登録日</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -424,6 +468,7 @@ export default function StudentsPage() {
             {students.length > 0 ? students.map(student => (
               <TableRow key={student.uid} onClick={() => handleStudentSelect(student)} className="cursor-pointer">
                 <TableCell className="font-medium">{student.name}</TableCell>
+                <TableCell className="font-mono text-xs">{student.studentCode}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{courseMap[student.course].name}</Badge>
                 </TableCell>
@@ -431,11 +476,11 @@ export default function StudentsPage() {
                     {monthlyCounts[student.uid] !== undefined ? `${monthlyCounts[student.uid]} / ${courseMap[student.course].limit}` : '-'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={student.isActive ? 'default' : 'secondary'}>
-                    {student.isActive ? '在籍中' : '休会中'}
-                  </Badge>
+                    <Badge variant={student.isActive ? 'default' : 'secondary'}>
+                        {student.isActive ? '在籍中' : '休会中'}
+                    </Badge>
+                     {student.linkedUserId ? <Badge variant="secondary" className="ml-2">連携済み</Badge> : <Badge variant="outline" className="ml-2">未連携</Badge>}
                 </TableCell>
-                <TableCell>{format(student.createdAt, 'yyyy/MM/dd')}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu onOpenChange={(open) => open && setSelectedStudent(student)}>
                     <DropdownMenuTrigger asChild>

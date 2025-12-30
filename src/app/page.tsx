@@ -19,14 +19,17 @@ export default function Home() {
         getDoc(userDocRef).then(docSnap => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            router.replace(userData.role === 'admin' ? '/admin' : '/student');
+            if (!userData.linkedStudentId) {
+                router.replace('/link-account');
+            } else if (userData.role === 'admin') {
+                router.replace('/admin');
+            } else {
+                router.replace('/student');
+            }
           } else {
-            // Fallback if user document doesn't exist, maybe redirect to a profile setup page
-            // This can happen if signup process is interrupted after auth creation but before firestore write
              router.replace('/login');
           }
         }).catch(() => {
-            // In case of firestore error, fallback
             router.replace('/login');
         });
       } else {

@@ -3,10 +3,12 @@ export type User = {
   uid: string;
   email: string | null;
   name?: string;
+  linkedStudentId?: string; // Add this line
 };
 
 export type Student = {
-  uid: string;
+  uid: string; // This is the student document ID, not the auth UID
+  studentCode: string; // The new "@121XXXX" code
   name: string;
   course: '2perMonth' | '3perMonth';
   email: string;
@@ -21,7 +23,10 @@ export type Student = {
     enabled: boolean;
     dow: 'sat' | 'sun' | 'either';
     slotKey: string; // HH:mm
-  }
+  };
+  linkToken?: string;
+  linkTokenExpiresAt?: Date;
+  linkedUserId?: string; // Firebase Auth UID
 };
 
 export type TimeSlot = {

@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -11,15 +11,72 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
 
-    // Matches a single user document.
-    // Users can read/write their own data.
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
     }
     
-    // Matches diary posts subcollection.
-    // Users can create, read, update, and delete their own posts.
+    function isLinkedStudent() {
+      return isSignedIn() && getUserData().linkedStudentId != null;
+    }
+    
+    function getStudentDocId() {
+      return getUserData().linkedStudentId;
+    }
+
+    // --- Collections ---
+
+    // Users can read/write their own profile. Admins can read anyone's profile.
+    match /users/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+    
+    // Students can read their own linked student record. Admins can read/write all.
+    match /students/{studentId} {
+      allow read: if isAdmin() || (isLinkedStudent() && studentId == getStudentDocId());
+      allow write: if isAdmin();
+    }
+    
+    // Counter for student codes, only backend/admin can write.
+    match /counters/studentCounter {
+        allow read: if isAdmin();
+        allow write: if false; // Only backend through admin SDK
+    }
+    
+    // Lessons can be read by linked students if it's their lesson, or by any admin.
+    // Write access is for admins only.
+    match /lessons/{lessonId} {
+        allow read: if isAdmin() || (isLinkedStudent() && resource.data.studentId == getStudentDocId());
+        allow write: if isAdmin();
+    }
+
+    // Admins can read/write all announcements. All signed-in users can read published ones.
+    match /announcements/{announcementId} {
+        allow read: if isAdmin() || (isSignedIn() && resource.data.published == true);
+        allow write: if isAdmin();
+    }
+    
+    // Swap requests: created by linked students for their own lessons.
+    // Read/write by admins. Students can read their own.
+    match /swapRequests/{requestId} {
+      allow create: if isLinkedStudent() && request.resource.data.studentId == getStudentDocId();
+      allow read: if isAdmin() || (isLinkedStudent() && resource.data.studentId == getStudentDocId());
+      allow update: if isAdmin(); // only admin can approve/reject
+      allow delete: if isAdmin();
+    }
+    
+    // App settings are read-only for clients, writable only by admin.
+    match /settings/app {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+    
+    // Old posts rule, can be refined later if needed.
     match /users/{userId}/posts/{postId} {
         allow create, read, update, delete: if isOwner(userId);
     }

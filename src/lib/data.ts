@@ -1,37 +1,30 @@
-
-
-// This file mocks data and API calls to a Firestore database.
-// In a real application, you would replace this with actual Firebase SDK calls.
-
-import { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
+import {
+    getFirestore,
+    doc,
+    collection,
+    getDocs,
+    getDoc,
+    setDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    query,
+    where,
+    Timestamp,
+    serverTimestamp,
+    runTransaction,
+    writeBatch,
+    collectionGroup,
+} from 'firebase/firestore';
+import type { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
 import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, parseISO } from 'date-fns';
+import { initializeFirebase } from '@/firebase';
 
-const ADMIN_UID = 'admin@example.com';
 
-let students: Student[] = [
-    // 20 students with realistic data
-    { uid: 'student1', name: '田中 恵子', course: '2perMonth', email: 'student1@example.com', createdAt: new Date('2023-01-10'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女', isActive: true, notes: 'アレルギーあり', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student2', name: '佐藤 太郎', course: '3perMonth', email: 'student2@example.com', createdAt: new Date('2023-01-15'), grade: '中1', age: 13, gender: 'male', displayTag: '中1/13歳/男', isActive: true, notes: '', preferredSlot: { enabled: true, dow: 'sat', slotKey: '10:00' } },
-    { uid: 'student3', name: '鈴木 花子', course: '2perMonth', email: 'student3@example.com', createdAt: new Date('2023-02-01'), grade: '高2', age: 17, gender: 'female', displayTag: '高2/17歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student4', name: '高橋 健太', course: '3perMonth', email: 'student4@example.com', createdAt: new Date('2023-02-20'), grade: '大人', age: 35, gender: 'male', displayTag: '大人', isActive: true, notes: '', preferredSlot: { enabled: true, dow: 'sun', slotKey: '11:00' } },
-    { uid: 'student5', name: '伊藤 さくら', course: '2perMonth', email: 'student5@example.com', createdAt: new Date('2023-03-05'), grade: '小5', age: 11, gender: 'female', displayTag: '小5/11歳/女', isActive: true, notes: '左利き', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student6', name: '渡辺 翔太', course: '3perMonth', email: 'student6@example.com', createdAt: new Date('2023-04-10'), grade: '小6', age: 12, gender: 'male', displayTag: '小6/12歳/男', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student7', name: '山本 美咲', course: '2perMonth', email: 'student7@example.com', createdAt: new Date('2023-05-12'), grade: '中2', age: 14, gender: 'female', displayTag: '中2/14歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student8', name: '中村 蓮', course: '3perMonth', email: 'student8@example.com', createdAt: new Date('2023-06-18'), grade: '大人', age: 42, gender: 'male', displayTag: '大人', isActive: false, notes: '海外出張のため長期休会', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student9', name: '小林 杏', course: '2perMonth', email: 'student9@example.com', createdAt: new Date('2023-07-22'), grade: '小2', age: 8, gender: 'female', displayTag: '小2/8歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student10', name: '加藤 陽菜', course: '3perMonth', email: 'student10@example.com', createdAt: new Date('2023-08-30'), grade: '小4', age: 10, gender: 'female', displayTag: '小4/10歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student11', name: '吉田 湊', course: '2perMonth', email: 'student11@example.com', createdAt: new Date('2023-09-05'), grade: '中3', age: 15, gender: 'male', displayTag: '中3/15歳/男', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student12', name: '山田 結衣', course: '3perMonth', email: 'student12@example.com', createdAt: new Date('2023-10-10'), grade: '高1', age: 16, gender: 'female', displayTag: '高1/16歳/女', isActive: true, notes: '', preferredSlot: { enabled: true, dow: 'sat', slotKey: '13:00' } },
-    { uid: 'student13', name: '佐々木 陸', course: '2perMonth', email: 'student13@example.com', createdAt: new Date('2023-11-15'), grade: '大人', age: 28, gender: 'male', displayTag: '大人', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student14', name: '山口 莉子', course: '3perMonth', email: 'student14@example.com', createdAt: new Date('2023-12-20'), grade: '小1', age: 7, gender: 'female', displayTag: '小1/7歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student15', name: '松本 悠人', course: '2perMonth', email: 'student15@example.com', createdAt: new Date('2024-01-25'), grade: '小6', age: 12, gender: 'male', displayTag: '小6/12歳/男', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student16', name: '井上 楓', course: '3perMonth', email: 'student16@example.com', createdAt: new Date('2024-02-10'), grade: '中2', age: 14, gender: 'female', displayTag: '中2/14歳/女', isActive: true, notes: '', preferredSlot: { enabled: true, dow: 'sun', slotKey: '14:00' } },
-    { uid: 'student17', name: '木村 拓海', course: '2perMonth', email: 'student17@example.com', createdAt: new Date('2024-03-18'), grade: '大人', age: 55, gender: 'male', displayTag: '大人', isActive: true, notes: '体験レッスン希望', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student18', name: '林 芽衣', course: '3perMonth', email: 'student18@example.com', createdAt: new Date('2024-04-02'), grade: '小3', age: 9, gender: 'female', displayTag: '小3/9歳/女', isActive: true, notes: '', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student19', name: '斎藤 蒼', course: '2perMonth', email: 'student19@example.com', createdAt: new Date('2024-05-09'), grade: '高3', age: 18, gender: 'male', displayTag: '高3/18歳/男', isActive: false, notes: '受験のため休会', preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' } },
-    { uid: 'student20', name: '橋本 凛', course: '3perMonth', email: 'student20@example.com', createdAt: new Date('2024-06-21'), grade: '中1', age: 13, gender: 'female', displayTag: '中1/13歳/女', isActive: true, notes: '', preferredSlot: { enabled: true, dow: 'sat', slotKey: '15:00' } },
-];
-
+// This function ensures that Firestore is initialized before we try to use it.
+const getDb = () => {
+    return getFirestore(initializeFirebase().firebaseApp);
+};
 
 export const fixedTimeSlotsDefinition = [
   { startTime: '10:00', endTime: '10:50' },
@@ -41,16 +34,6 @@ export const fixedTimeSlotsDefinition = [
   { startTime: '15:00', endTime: '15:50' },
 ];
 
-let appSettings: AppSettings = {
-    defaultSlotCapacity: 4,
-    activeDatesByMonth: {},
-};
-
-/**
- * Gets the default active dates for a given month (first 6 weekend days).
- * @param month The month to get active dates for.
- * @returns An array of date strings (YYYY-MM-DD).
- */
 export const getDefaultActiveDatesForMonth = (month: Date): string[] => {
     const start = startOfMonth(month);
     const end = endOfMonth(month);
@@ -59,460 +42,382 @@ export const getDefaultActiveDatesForMonth = (month: Date): string[] => {
     return allWeekendDays.slice(0, 6).map(day => format(day, 'yyyy-MM-dd'));
 }
 
+// --- Helper Functions to get references ---
+const getStudentRef = (studentId: string) => doc(getDb(), 'students', studentId);
+const getLessonRef = (lessonId: string) => doc(getDb(), 'lessons', lessonId);
+const getAnnouncementRef = (announcementId: string) => doc(getDb(), 'announcements', announcementId);
+const getSwapRequestRef = (requestId: string) => doc(getDb(), 'swapRequests', requestId);
 
-// Generate slots and lessons for the current and next month
-const generateInitialData = () => {
-  let slots: TimeSlot[] = [];
-  let lessons: Lesson[] = [];
-  const today = new Date();
-  // Generate for current, previous, and next two months
-  const monthsToGenerate = [addMonths(today, -1), today, addMonths(today, 1), addMonths(today, 2)];
-
-  monthsToGenerate.forEach(month => {
-    const monthKey = format(month, 'yyyy-MM');
-    const activeDates = appSettings.activeDatesByMonth[monthKey] || getDefaultActiveDatesForMonth(month);
-
-    activeDates.forEach(dateStr => {
-      fixedTimeSlotsDefinition.forEach(time => {
-        const slotId = `${dateStr}-${time.startTime}`;
-        slots.push({
-          slotId: slotId,
-          date: dateStr,
-          startTime: time.startTime,
-          endTime: time.endTime,
-          capacity: appSettings.defaultSlotCapacity,
-          assignedStudentIds: [],
-        });
-      });
-    });
-  });
-
-  return { slots, lessons };
-};
-
-const initialData = generateInitialData();
-let slots: TimeSlot[] = initialData.slots;
-let lessons: Lesson[] = initialData.lessons;
-
-let announcements: Announcement[] = [
-  { id: 'anno1', title: '【重要】教室移転のお知らせ', body: '来月より、教室が新しい場所に移転します。詳細は別途メールにてご連絡いたします。', published: true, createdAt: new Date('2023-04-01') },
-  { id: 'anno2', title: '夏期講習の申し込み開始', body: '夏期講習の申し込みを開始しました。ご希望の方はお早めにお申し込みください。', published: true, createdAt: new Date('2023-03-15') },
-  { id: 'anno3', title: '新しい筆の入荷', body: '新しい種類の筆を入荷しました。ぜひお試しください。', published: true, createdAt: new Date('2023-03-01') },
-  { id: 'anno4', title: '年末年始の休講日（下書き）', body: '年末年始は12月28日から1月4日まで休講となります。', published: false, createdAt: new Date('2023-02-15') },
-];
-
-let swapRequests: SwapRequest[] = [
-  {
-    requestId: 'swap1',
-    studentId: 'student1',
-    fromLessonId: '', // Will be populated dynamically if needed
-    preferredDates: ['2024-08-10', '2024-08-17'],
-    note: '学校行事のため、振替をお願いします。',
-    status: 'pending',
-    createdAt: new Date(),
-  },
-];
-
-
-// --- Auto-apply preferred slots ---
-const applyPreferredSlots = async () => {
-    const today = new Date();
-    const monthsToProcess = [today, addMonths(today, 1)];
-    const activeStudentsWithPrefs = students.filter(s => s.isActive && s.preferredSlot.enabled);
-
-    for (const student of activeStudentsWithPrefs) {
-        for (const monthDate of monthsToProcess) {
-            const monthKey = format(monthDate, 'yyyy-MM');
-            const limit = student.course === '2perMonth' ? 2 : 3;
-            let currentBookingsCount = await countStudentLessonsInMonth(student.uid, monthDate);
-
-            if (currentBookingsCount >= limit) continue;
-
-            const activeDates = appSettings.activeDatesByMonth[monthKey] || getDefaultActiveDatesForMonth(monthDate);
-            const { dow, slotKey } = student.preferredSlot;
-
-            for (const dateStr of activeDates) {
-                if (currentBookingsCount >= limit) break;
-
-                const date = parseISO(dateStr);
-                const dateDow = date.getDay(); // 0=Sun, 6=Sat
-
-                const dowMatches = dow === 'either' || (dow === 'sat' && dateDow === 6) || (dow === 'sun' && dateDow === 0);
-                if (!dowMatches) continue;
-
-                const slotId = `${dateStr}-${slotKey}`;
-                const slot = slots.find(s => s.slotId === slotId);
-
-                if (slot && slot.assignedStudentIds.length < slot.capacity) {
-                    const alreadyBooked = lessons.some(l => l.studentId === student.uid && l.slotId === slotId && (l.status === 'approved' || l.status === 'scheduled'));
-                    if (alreadyBooked) continue;
-                    
-                    // Re-check count inside loop to be safe
-                    const count = lessons.filter(l => l.studentId === student.uid && findSlot(l.slotId)?.date.startsWith(monthKey) && (l.status === 'approved' || l.status === 'scheduled')).length;
-                    if(count >= limit) continue;
-
-
-                    // Add lesson
-                    lessons.push({
-                        lessonId: `lesson-${student.uid}-${slotId}`,
-                        studentId: student.uid,
-                        slotId: slotId,
-                        status: 'approved',
-                        priority: 'fixed',
-                        updatedAt: new Date(),
-                        createdBy: 'teacher',
-                        source: 'preferredSlotAuto',
-                    });
-
-                    // Add student to slot
-                    slot.assignedStudentIds.push(student.uid);
-
-                    currentBookingsCount++;
-                }
-            }
-        }
-    }
-}
-// Run once on startup after a short delay
-setTimeout(applyPreferredSlots, 100);
-
-// Mock API functions
-const FAKE_DELAY = 500;
-
-const findSlot = (slotId: string) => slots.find(s => s.slotId === slotId);
-const findStudent = (studentId: string) => students.find(s => s.uid === studentId);
-const findLesson = (lessonId: string) => lessons.find(l => l.lessonId === lessonId);
-
-const toLessonWithDetails = (lesson: Lesson): LessonWithDetails | null => {
-  const slot = findSlot(lesson.slotId);
-  const student = findStudent(lesson.studentId);
-  if (!slot || !student) return null;
-  return {
-    ...lesson,
-    studentName: student.name,
-    slotDate: slot.date,
-    slotStartTime: slot.startTime,
-    slotEndTime: slot.endTime,
-  }
-}
-
-export const getStudentUpcomingLessons = async (studentId: string): Promise<LessonWithDetails[]> => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const studentLessons = lessons
-        .filter(l => l.studentId === studentId && new Date(findSlot(l.slotId)?.date || 0) >= new Date())
-        .map(toLessonWithDetails)
-        .filter((l): l is LessonWithDetails => l !== null)
-        .sort((a, b) => new Date(a.slotDate).getTime() - new Date(b.slotDate).getTime());
-      resolve(studentLessons);
-    }, FAKE_DELAY);
-  });
-};
-
-export const getLessonDetails = async (lessonId: string, studentId: string): Promise<LessonWithDetails | null> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            const lesson = findLesson(lessonId);
-            if (!lesson || lesson.studentId !== studentId) {
-                reject(new Error("Lesson not found or access denied."));
-                return;
-            }
-            const details = toLessonWithDetails(lesson);
-            if (details) {
-                resolve(details);
-            } else {
-                reject(new Error("Could not retrieve lesson details."));
-            }
-        }, FAKE_DELAY);
-    });
-};
-
-
-export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve(announcements.filter(a => a.published).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
-    }, FAKE_DELAY);
-  });
-};
-
-// --- Admin Functions ---
-
-export const getAppSettings = async (): Promise<AppSettings> => {
-    return new Promise(resolve => setTimeout(() => resolve(appSettings), FAKE_DELAY / 2));
-}
-
-export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<AppSettings> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            appSettings = { ...appSettings, ...newSettings };
-            resolve(appSettings);
-        }, FAKE_DELAY);
-    });
-}
-
+// --- Student API ---
 export const getAllStudents = async (): Promise<Student[]> => {
-    return new Promise(resolve => setTimeout(() => resolve(students.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())), FAKE_DELAY));
-}
-
-export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const monthStr = format(month, 'yyyy-MM');
-            resolve(JSON.parse(JSON.stringify(slots.filter(s => s.date.startsWith(monthStr)))));
-        }, FAKE_DELAY);
-    });
-}
-
-export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(JSON.parse(JSON.stringify(slots.filter(s => s.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime)))));
-        }, FAKE_DELAY);
-    });
-}
+    const q = query(collection(getDb(), 'students'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        ...doc.data(),
+        uid: doc.id,
+        createdAt: (doc.data().createdAt as Timestamp).toDate(),
+    } as Student));
+};
 
 export const getStudentDetails = async (studentId: string): Promise<Student | undefined> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(findStudent(studentId));
-        }, FAKE_DELAY);
-    });
+    const studentDoc = await getDoc(getStudentRef(studentId));
+    if (studentDoc.exists()) {
+        const data = studentDoc.data();
+        return {
+            ...data,
+            uid: studentDoc.id,
+            createdAt: (data.createdAt as Timestamp).toDate(),
+        } as Student;
+    }
+    return undefined;
 };
 
-export const createStudent = async (data: Omit<Student, 'uid' | 'createdAt' | 'isActive' | 'preferredSlot'>): Promise<Student> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (!data.name || !data.email || !data.course) {
-                return reject(new Error("Missing required fields."));
-            }
-            const newStudent: Student = {
-                uid: `student${students.length + 1}`,
-                createdAt: new Date(),
-                isActive: true,
-                preferredSlot: { enabled: false, dow: 'either', slotKey: '10:00' },
-                ...data
-            };
-            students.push(newStudent);
-            resolve(newStudent);
-        }, FAKE_DELAY);
-    });
-}
+export const createStudent = async (data: Omit<Student, 'uid' | 'createdAt' | 'studentCode' | 'linkToken' | 'linkTokenExpiresAt' | 'linkedUserId'>): Promise<Student> => {
+    const db = getDb();
+    const counterRef = doc(db, 'counters', 'studentCounter');
+    const newStudentRef = doc(collection(db, 'students'));
 
-export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<Student> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            const index = students.findIndex(s => s.uid === studentId);
-            if (index !== -1) {
-                const oldStudent = students[index];
-                students[index] = { ...students[index], ...data };
-                
-                // If preferred slot was toggled, re-apply
-                if (data.preferredSlot && oldStudent.preferredSlot.enabled !== data.preferredSlot.enabled && data.preferredSlot.enabled) {
-                   await applyPreferredSlots();
-                }
+    let newStudentCode = '';
 
-                resolve(students[index]);
-            } else {
-                reject(new Error("Student not found."));
-            }
-        }, FAKE_DELAY);
+    await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        
+        let newCount;
+        if (!counterDoc.exists()) {
+            newCount = 1;
+        } else {
+            newCount = (counterDoc.data().current || 0) + 1;
+        }
+        
+        transaction.set(counterRef, { current: newCount }, { merge: true });
+        
+        newStudentCode = `@121${String(newCount).padStart(4, '0')}`;
     });
+
+    const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
+    const linkTokenExpiresAt = Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)); // 24 hours from now
+
+    const newStudentData = {
+        ...data,
+        studentCode: newStudentCode,
+        createdAt: serverTimestamp(),
+        linkToken: linkToken,
+        linkTokenExpiresAt: linkTokenExpiresAt,
+        isActive: true,
+    };
+
+    await setDoc(newStudentRef, newStudentData);
+
+    return {
+        ...newStudentData,
+        uid: newStudentRef.id,
+        createdAt: new Date(), // This will be slightly different from server timestamp, but okay for return
+    } as Student;
+};
+
+export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<void> => {
+    // Prevent sensitive fields from being updated directly through this function
+    const { uid, studentCode, linkedUserId, ...updateData } = data;
+    return await updateDoc(getStudentRef(studentId), updateData);
 };
 
 export const deleteStudent = async (studentId: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            const initialLength = students.length;
-            students = students.filter(s => s.uid !== studentId);
-            if (students.length < initialLength) {
-                // Also remove their lessons
-                lessons = lessons.filter(l => l.studentId !== studentId);
-                // And remove from slots
-                slots.forEach(slot => {
-                    slot.assignedStudentIds = slot.assignedStudentIds.filter(id => id !== studentId);
-                });
-                resolve();
-            } else {
-                reject(new Error("Student not found."));
-            }
-        }, FAKE_DELAY);
-    });
+    const db = getDb();
+    const batch = writeBatch(db);
+
+    // 1. Delete student document
+    batch.delete(getStudentRef(studentId));
+
+    // 2. Find and delete all lessons for that student
+    const lessonsQuery = query(collection(db, 'lessons'), where('studentId', '==', studentId));
+    const lessonsSnapshot = await getDocs(lessonsQuery);
+    lessonsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+    // 3. Find and delete user if linked
+    const studentDoc = await getStudentDetails(studentId);
+    if(studentDoc?.linkedUserId) {
+        batch.delete(doc(db, 'users', studentDoc.linkedUserId));
+    }
+    
+    return await batch.commit();
 };
 
+
+// --- Lesson and Slot API ---
+export const getStudentUpcomingLessons = async (studentId: string): Promise<LessonWithDetails[]> => {
+    const db = getDb();
+    
+    // First, find the student's document ID from their auth UID
+    const userRef = doc(db, 'users', studentId);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists() || !userDoc.data().linkedStudentId) {
+        return [];
+    }
+    const studentDocId = userDoc.data().linkedStudentId;
+
+
+    const q = query(collection(getDb(), 'lessons'), where('studentId', '==', studentDocId));
+    const lessonSnap = await getDocs(q);
+    const lessons = lessonSnap.docs
+        .map(doc => ({ ...doc.data(), lessonId: doc.id } as Lesson))
+        .filter(l => new Date(l.slotId.substring(0, 10)) >= new Date());
+
+    const student = await getStudentDetails(studentDocId);
+    if (!student) return [];
+
+    return lessons.map(l => ({
+        ...l,
+        studentName: student.name,
+        slotDate: l.slotId.substring(0, 10),
+        slotStartTime: l.slotId.substring(11),
+        slotEndTime: fixedTimeSlotsDefinition.find(fts => fts.startTime === l.slotId.substring(11))?.endTime || '',
+    })).sort((a,b) => new Date(a.slotDate).getTime() - new Date(b.slotDate).getTime());
+};
+
+export const getLessonDetails = async (lessonId: string, authUid: string): Promise<LessonWithDetails | null> => {
+    const lesson = await getDoc(getLessonRef(lessonId));
+    if (!lesson.exists()) return null;
+
+    const lessonData = { ...lesson.data(), lessonId: lesson.id } as Lesson;
+    
+    const userRef = doc(getDb(), 'users', authUid);
+    const userDoc = await getDoc(userRef);
+
+    if(!userDoc.exists() || userDoc.data().linkedStudentId !== lessonData.studentId) {
+        // Security check: user can only fetch their own lesson
+        throw new Error("Permission denied.");
+    }
+    
+    const student = await getStudentDetails(lessonData.studentId);
+    if (!student) return null;
+
+    return {
+        ...lessonData,
+        studentName: student.name,
+        slotDate: lessonData.slotId.substring(0, 10),
+        slotStartTime: lessonData.slotId.substring(11),
+        slotEndTime: fixedTimeSlotsDefinition.find(fts => fts.startTime === lessonData.slotId.substring(11))?.endTime || '',
+    };
+};
 
 export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const monthStr = format(month, 'yyyy-MM');
-            const count = lessons.filter(l => {
-                const slot = findSlot(l.slotId);
-                return l.studentId === studentId &&
-                       (l.status === 'approved' || l.status === 'scheduled') &&
-                       slot &&
-                       slot.date.startsWith(monthStr);
-            }).length;
-            resolve(count);
-        }, FAKE_DELAY / 10);
-    });
+    const monthStr = format(month, 'yyyy-MM');
+    const q = query(
+        collection(getDb(), 'lessons'), 
+        where('studentId', '==', studentId),
+        where('status', 'in', ['approved', 'scheduled'])
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.filter(doc => doc.data().slotId.startsWith(monthStr)).length;
 }
 
-export const updateSlotAssignments = async (slotId: string, studentIds: string[]): Promise<TimeSlot> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            let slot = slots.find(s => s.slotId === slotId);
+export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
+    const monthStr = format(month, 'yyyy-MM');
+    // For simplicity, we query lessons and aggregate them into slots client-side.
+    // A more scalable solution might use aggregated data in Firestore.
+    const lessonsQuery = query(collection(getDb(), 'lessons'), where('status', 'in', ['approved', 'scheduled']));
+    const lessonsSnapshot = await getDocs(lessonsQuery);
+    const lessonsInMonth = lessonsSnapshot.docs
+        .map(d => d.data() as Lesson)
+        .filter(l => l.slotId.startsWith(monthStr));
 
-            // If slot doesn't exist, create it.
-            if (!slot) {
-                const dateParts = slotId.split('-');
-                if (dateParts.length < 4) return reject(new Error("Invalid slotId format."));
-                
-                const date = dateParts.slice(0, 3).join('-'); // "YYYY-MM-DD"
-                const startTime = dateParts.slice(3).join(':'); // "HH:mm"
-                
-                const timeDef = fixedTimeSlotsDefinition.find(t => t.startTime === startTime);
-                if (!date.match(/^\d{4}-\d{2}-\d{2}$/) || !timeDef) {
-                    return reject(new Error("Invalid slotId format."));
-                }
-                const newSlot: TimeSlot = {
+    const slotsMap: Map<string, TimeSlot> = new Map();
+    const settings = await getAppSettings();
+
+    const activeDates = settings.activeDatesByMonth[monthStr] || getDefaultActiveDatesForMonth(month);
+
+    // Initialize all possible slots for active dates
+    for (const date of activeDates) {
+        for (const timeDef of fixedTimeSlotsDefinition) {
+            const slotId = `${date}-${timeDef.startTime}`;
+            slotsMap.set(slotId, {
+                slotId,
+                date,
+                startTime: timeDef.startTime,
+                endTime: timeDef.endTime,
+                capacity: settings.defaultSlotCapacity,
+                assignedStudentIds: [],
+            });
+        }
+    }
+    
+    // Populate with lessons
+    lessonsInMonth.forEach(lesson => {
+        let slot = slotsMap.get(lesson.slotId);
+        if (slot) {
+            slot.assignedStudentIds.push(lesson.studentId);
+        }
+    });
+
+    return Array.from(slotsMap.values());
+}
+
+export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
+    const lessonsQuery = query(collection(getDb(), 'lessons'), where('status', 'in', ['approved', 'scheduled']));
+    const lessonsSnapshot = await getDocs(lessonsQuery);
+    const lessonsOnDay = lessonsSnapshot.docs.map(d => d.data() as Lesson).filter(l => l.slotId.startsWith(date));
+    
+    const slotsMap: Map<string, TimeSlot> = new Map();
+    const settings = await getAppSettings();
+    
+    fixedTimeSlotsDefinition.forEach(timeDef => {
+        const slotId = `${date}-${timeDef.startTime}`;
+        slotsMap.set(slotId, {
+            slotId,
+            date,
+            startTime: timeDef.startTime,
+            endTime: timeDef.endTime,
+            capacity: settings.defaultSlotCapacity,
+            assignedStudentIds: [],
+        });
+    });
+
+    lessonsOnDay.forEach(lesson => {
+        let slot = slotsMap.get(lesson.slotId);
+        if (slot) {
+            slot.assignedStudentIds.push(lesson.studentId);
+        }
+    });
+
+    return Array.from(slotsMap.values()).sort((a,b) => a.startTime.localeCompare(b.startTime));
+};
+
+export const updateSlotAssignments = async (slotId: string, studentIds: string[]): Promise<void> => {
+    const db = getDb();
+    
+    await runTransaction(db, async (transaction) => {
+        const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
+        const currentLessonsSnap = await getDocs(lessonsQuery);
+        const currentStudentIds = new Set(currentLessonsSnap.docs.map(doc => doc.data().studentId));
+        const newStudentIds = new Set(studentIds);
+
+        // Students to remove
+        for (const doc of currentLessonsSnap.docs) {
+            const studentId = doc.data().studentId;
+            if (!newStudentIds.has(studentId)) {
+                transaction.delete(doc.ref);
+            }
+        }
+
+        // Students to add
+        for (const studentId of newStudentIds) {
+            if (!currentStudentIds.has(studentId)) {
+                const newLessonRef = doc(collection(db, 'lessons'));
+                transaction.set(newLessonRef, {
+                    studentId,
                     slotId,
-                    date,
-                    startTime: timeDef.startTime,
-                    endTime: timeDef.endTime,
-                    capacity: appSettings.defaultSlotCapacity,
-                    assignedStudentIds: [],
-                };
-                slots.push(newSlot);
-                slot = newSlot;
+                    status: 'approved',
+                    priority: 'normal',
+                    updatedAt: serverTimestamp(),
+                    createdBy: 'teacher',
+                    source: 'manual',
+                });
             }
-
-            if (studentIds.length > slot.capacity) {
-                return reject(new Error("Capacity exceeded"));
-            }
-
-            const oldStudentIds = new Set(slot.assignedStudentIds);
-            const newStudentIds = new Set(studentIds);
-
-            // Remove lessons for students who are no longer in the slot
-            oldStudentIds.forEach(studentId => {
-                if (!newStudentIds.has(studentId)) {
-                    lessons = lessons.filter(l => !(l.slotId === slotId && l.studentId === studentId));
-                }
-            });
-
-            // Add lessons for new students
-            newStudentIds.forEach(studentId => {
-                if (!oldStudentIds.has(studentId)) {
-                    lessons.push({
-                        lessonId: `lesson-${studentId}-${slotId}`,
-                        studentId: studentId,
-                        slotId: slotId,
-                        status: 'approved',
-                        priority: 'normal',
-                        updatedAt: new Date(),
-                        createdBy: 'teacher',
-                        source: 'manual',
-                    });
-                }
-            });
-
-            slot.assignedStudentIds = studentIds;
-            resolve(JSON.parse(JSON.stringify(slot)));
-        }, FAKE_DELAY);
+        }
     });
 };
 
+// --- Announcement API ---
+export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
+    const q = query(collection(getDb(), 'announcements'), where('published', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(doc => ({ ...doc.data(), id: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as Announcement))
+        .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
 
 export const getAllAnnouncements = async (): Promise<Announcement[]> => {
-    return new Promise(resolve => setTimeout(() => resolve(announcements.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime())), FAKE_DELAY));
-}
+    const snapshot = await getDocs(collection(getDb(), 'announcements'));
+    return snapshot.docs
+        .map(doc => ({ ...doc.data(), id: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as Announcement))
+        .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
 
 export const saveAnnouncement = async (announcement: Partial<Announcement>): Promise<Announcement> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            if (announcement.id) {
-                const index = announcements.findIndex(a => a.id === announcement.id);
-                if (index !== -1) {
-                    announcements[index] = { ...announcements[index], ...announcement };
-                    resolve(announcements[index]);
-                }
-            } else {
-                const newAnnouncement: Announcement = {
-                    id: `anno${announcements.length + 1}`,
-                    title: '',
-                    body: '',
-                    published: false,
-                    createdAt: new Date(),
-                    ...announcement
-                };
-                announcements.unshift(newAnnouncement);
-                resolve(newAnnouncement);
-            }
-        }, FAKE_DELAY)
-    });
-}
+    if (announcement.id) {
+        const { id, ...data } = announcement;
+        await updateDoc(getAnnouncementRef(id), { ...data, createdAt: serverTimestamp() });
+        return { ...announcement, createdAt: new Date() } as Announcement;
+    } else {
+        const newDocRef = await addDoc(collection(getDb(), 'announcements'), { ...announcement, createdAt: serverTimestamp() });
+        return { ...announcement, id: newDocRef.id, createdAt: new Date() } as Announcement;
+    }
+};
+
+// --- Swap Request API ---
+export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<SwapRequest> => {
+    const db = getDb();
+    const batch = writeBatch(db);
+
+    const newRequestRef = doc(collection(db, 'swapRequests'));
+    const newRequest: Omit<SwapRequest, 'requestId'> = {
+        ...request,
+        createdAt: new Date(), // will be replaced by server timestamp
+        status: 'pending',
+    };
+    batch.set(newRequestRef, { ...newRequest, createdAt: serverTimestamp() });
+    
+    const lessonRef = getLessonRef(request.fromLessonId);
+    batch.update(lessonRef, { status: 'swap_pending' });
+
+    await batch.commit();
+    return { ...newRequest, requestId: newRequestRef.id };
+};
 
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
-     return new Promise(resolve => {
-        setTimeout(() => {
-            const detailedRequests = swapRequests.map(req => {
-                const fromLesson = lessons.find(l => l.lessonId === req.fromLessonId);
-                if (!fromLesson) return null;
-
-                const lessonDetails = toLessonWithDetails(fromLesson);
-                if (!lessonDetails) return null;
-
-                return {
-                    ...req,
-                    studentName: lessonDetails.studentName,
-                    fromLesson: lessonDetails,
-                }
-            }).filter((r): r is SwapRequestWithDetails => r !== null);
-            resolve(detailedRequests);
-        }, FAKE_DELAY);
-     });
-}
+    const snapshot = await getDocs(collection(getDb(), 'swapRequests'));
+    const requests = snapshot.docs.map(doc => ({ ...doc.data(), requestId: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as SwapRequest));
+    
+    const detailedRequests: SwapRequestWithDetails[] = [];
+    for(const req of requests) {
+        const student = await getStudentDetails(req.studentId);
+        const lesson = await getLessonDetails(req.fromLessonId, 'admin'); // Assuming admin can see all
+        if(student && lesson) {
+            detailedRequests.push({ ...req, studentName: student.name, fromLesson: lesson });
+        }
+    }
+    return detailedRequests;
+};
 
 export const updateSwapRequestStatus = async (requestId: string, status: 'approved' | 'rejected'): Promise<SwapRequest> => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            const index = swapRequests.findIndex(r => r.requestId === requestId);
-            if (index === -1) return reject(new Error("Request not found"));
-            swapRequests[index].status = status;
-            
-            // If approved, also update the original lesson status
-            if (status === 'approved') {
-                const lessonId = swapRequests[index].fromLessonId;
-                const lessonIndex = lessons.findIndex(l => l.lessonId === lessonId);
-                if (lessonIndex !== -1) {
-                    lessons[lessonIndex].status = 'swapped';
-                }
-            }
+    const db = getDb();
+    const batch = writeBatch(db);
+    const reqRef = getSwapRequestRef(requestId);
 
-            resolve(swapRequests[index]);
-        }, FAKE_DELAY);
-    });
+    batch.update(reqRef, { status });
+
+    const requestSnap = await getDoc(reqRef);
+    const request = requestSnap.data() as SwapRequest;
+    if(status === 'approved') {
+        // Logic to move student to new slot would go here.
+        // For now, just mark original lesson as 'swapped'.
+        batch.update(getLessonRef(request.fromLessonId), { status: 'swapped' });
+    } else if (status === 'rejected') {
+        // Revert lesson status to 'scheduled'
+        batch.update(getLessonRef(request.fromLessonId), { status: 'scheduled' });
+    }
+
+    await batch.commit();
+    return { ...request, status };
 };
 
-export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<SwapRequest> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const newRequest: SwapRequest = {
-                ...request,
-                requestId: `swap${swapRequests.length + 1}`,
-                createdAt: new Date(),
-                status: 'pending'
-            };
-            swapRequests.push(newRequest);
 
-            const lessonIndex = lessons.findIndex(l => l.lessonId === request.fromLessonId);
-            if (lessonIndex !== -1) {
-                lessons[lessonIndex].status = 'swap_pending';
-            }
-
-            resolve(newRequest);
-        }, FAKE_DELAY);
-    });
+// --- App Settings ---
+export const getAppSettings = async (): Promise<AppSettings> => {
+    const docRef = doc(getDb(), 'settings', 'app');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as AppSettings;
+    }
+    // Return default settings if not found
+    return {
+        defaultSlotCapacity: 4,
+        activeDatesByMonth: {},
+    };
 };
 
-    
+export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<AppSettings> => {
+    const docRef = doc(getDb(), 'settings', 'app');
+    await setDoc(docRef, newSettings, { merge: true });
+    return await getAppSettings();
+};
