@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Card } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const courseMap: { [key in Student['course']]: { name: string; limit: number } } = {
@@ -317,7 +318,7 @@ export default function SchedulePage() {
               const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
               
               return (
-                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0 w-32", !isActive && "bg-muted/30")}>
+                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0 w-40", !isActive && "bg-muted/30")}>
                   <Link href={isActive ? `/admin/day/${dayString}` : '#'} className={cn("block", isActive && "hover:bg-muted/50", !isActive && "cursor-not-allowed")}>
                     <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "", !isActive && "text-muted-foreground")}>
                       <p>{format(day, 'd')}</p>
@@ -362,12 +363,27 @@ export default function SchedulePage() {
                       const remaining = capacity - occupancy;
                       
                       return (
-                        <div key={slot.slotId} className={cn("h-24 border-b p-2 text-xs relative group")}>
-                          <p className="font-semibold">{slot.startTime}</p>
-                          <div className={cn('text-sm', isFull ? 'text-destructive font-bold' : '')}>
-                              {isFull ? '満席' : `残${remaining}`}
+                        <div key={slot.slotId} className={cn("h-24 border-b p-2 text-xs relative group flex flex-col")}>
+                          <div className="flex justify-between">
+                            <p className="font-semibold">{slot.startTime}</p>
+                             <div className={cn('text-sm', isFull ? 'text-destructive font-bold' : '')}>
+                                {isFull ? '満席' : `残${remaining}`}
+                            </div>
                           </div>
-                          <p className="text-muted-foreground">{occupancy}/{capacity}人</p>
+                          <p className="text-muted-foreground text-xs">{occupancy}/{capacity}人</p>
+                          
+                          <ScrollArea className="flex-grow my-1">
+                            <div className="space-y-1">
+                                {slot.assignedStudentIds.map(studentId => {
+                                    const student = allStudents.find(s => s.uid === studentId);
+                                    return (
+                                        <div key={studentId} className="bg-muted/50 text-foreground text-[10px] px-1.5 py-0.5 rounded-sm truncate">
+                                            {student?.name || '不明な生徒'}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                          </ScrollArea>
                           
                           <Button
                               variant="ghost" size="icon"
