@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -198,11 +199,9 @@ function StudentSheet({
         setIsSaving(true);
         try {
             if (isNew) {
-                const newStudent = await createStudent(formData as Omit<Student, 'uid' | 'createdAt' | 'studentCode' | 'linkToken' | 'linkTokenExpiresAt' | 'linkedUserId'>);
-                toast({ title: '成功', description: '新しい生徒が追加されました。'});
-                // After creating, keep the sheet open and switch to edit mode
-                onStudentUpdate(); // This will refetch and update the list
-                onOpenChange(false); // Close the sheet after creation
+                await createStudent(formData);
+                toast({ title: '成功', description: '新しい生徒が追加されました。コードとトークンが生成されるまで少しお待ちください。'});
+                onOpenChange(false);
                 
             } else if(student?.uid) {
                 await updateStudent(student.uid, formData);
@@ -251,17 +250,17 @@ function StudentSheet({
                                 <div className="space-y-2">
                                     <Label>生徒コード</Label>
                                     <div className="flex items-center">
-                                        <Input readOnly value={formData.studentCode || ''} className="bg-muted"/>
-                                        <CopyToClipboard text={formData.studentCode || ''} />
+                                        <Input readOnly value={formData.studentCode || '生成中...'} className="bg-muted"/>
+                                        {formData.studentCode && <CopyToClipboard text={formData.studentCode} />}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label>連携トークン</Label>
                                     <div className="flex items-center">
-                                        <Input readOnly value={formData.linkToken || '発行されていません'} className="bg-muted" />
+                                        <Input readOnly value={formData.linkToken || '生成中...'} className="bg-muted" />
                                         {formData.linkToken && <CopyToClipboard text={formData.linkToken} />}
                                     </div>
-                                    {formData.linkTokenExpiresAt && <p className="text-xs text-muted-foreground">有効期限: {format((formData.linkTokenExpiresAt as any).toDate(), 'yyyy/MM/dd HH:mm')}</p>}
+                                    {formData.linkTokenExpiresAt && <p className="text-xs text-muted-foreground">有効期限: {format((formData.linkTokenExpiresAt as any), 'yyyy/MM/dd HH:mm')}</p>}
                                 </div>
                                  <p className="text-xs text-muted-foreground">
                                     {formData.linkedUserId ? `連携済み (ユーザーID: ${formData.linkedUserId.substring(0,10)}...)` : '未連携'}
@@ -407,10 +406,11 @@ export default function StudentsPage() {
                 studentsData.push({
                     ...data,
                     uid: doc.id,
-                    createdAt: (data.createdAt as Timestamp).toDate(),
+                    createdAt: (data.createdAt as Timestamp)?.toDate(),
+                    linkTokenExpiresAt: (data.linkTokenExpiresAt as Timestamp)?.toDate(),
                 } as Student);
             });
-            setStudents(studentsData.sort((a, b) => (a.createdAt as any) - (b.createdAt as any)));
+            setStudents(studentsData.sort((a, b) => ((a.createdAt as any) || 0) - ((b.createdAt as any) || 0)));
             fetchMonthlyCounts(studentsData, currentMonth);
             setLoading(false);
         }, (error) => {
@@ -438,6 +438,19 @@ export default function StudentsPage() {
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
       setCurrentMonth(current => direction === 'prev' ? subMonths(current, 1) : addMonths(current, 1));
+  }
+
+  const handleDelete = async (studentId: string) => {
+      if (!studentId) return;
+      try {
+          await deleteStudent(studentId);
+          toast({ title: '成功', description: '生徒が削除されました。'});
+          onStudentUpdate();
+          setIsSheetOpen(false);
+          setSelectedStudent(null);
+      } catch (error) {
+          toast({ title: '失敗', description: '削除に失敗しました。', variant: 'destructive'});
+      }
   }
 
   if (loading) return <Loading />;
@@ -468,12 +481,12 @@ export default function StudentsPage() {
             {students.length > 0 ? students.map(student => (
               <TableRow key={student.uid} onClick={() => handleStudentSelect(student)} className="cursor-pointer">
                 <TableCell className="font-medium">{student.name}</TableCell>
-                <TableCell className="font-mono text-xs">{student.studentCode}</TableCell>
+                <TableCell className="font-mono text-xs">{student.studentCode || '生成中...'}</TableCell>
                 <TableCell>
-                  <Badge variant="outline">{courseMap[student.course].name}</Badge>
+                  <Badge variant="outline">{courseMap[student.course]?.name || student.course}</Badge>
                 </TableCell>
                 <TableCell>
-                    {monthlyCounts[student.uid] !== undefined ? `${monthlyCounts[student.uid]} / ${courseMap[student.course].limit}` : '-'}
+                    {monthlyCounts[student.uid] !== undefined ? `${monthlyCounts[student.uid]} / ${courseMap[student.course]?.limit || 'N/A'}` : '-'}
                 </TableCell>
                 <TableCell>
                     <Badge variant={student.isActive ? 'default' : 'secondary'}>
@@ -542,16 +555,5 @@ export default function StudentsPage() {
       />
     </div>
   );
-  async function handleDelete(studentId: string) {
-      if (!studentId) return;
-      try {
-          await deleteStudent(studentId);
-          toast({ title: '成功', description: '生徒が削除されました。'});
-          onStudentUpdate();
-          setIsSheetOpen(false);
-          setSelectedStudent(null);
-      } catch (error) {
-          toast({ title: '失敗', description: '削除に失敗しました。', variant: 'destructive'});
-      }
-  }
 }
+

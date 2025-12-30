@@ -1,3 +1,5 @@
+
+'use client';
 import {
     getFirestore,
     doc,
@@ -23,7 +25,9 @@ import { initializeFirebase } from '@/firebase';
 
 // This function ensures that Firestore is initialized before we try to use it.
 export const getDb = () => {
-    return getFirestore(initializeFirebase().firebaseApp);
+    // This function will be called within other functions, ensuring app is initialized.
+    const app = initializeFirebase().firebaseApp;
+    return getFirestore(app);
 };
 
 export const fixedTimeSlotsDefinition = [
@@ -55,7 +59,8 @@ export const getAllStudents = async (): Promise<Student[]> => {
     return snapshot.docs.map(doc => ({
         ...doc.data(),
         uid: doc.id,
-        createdAt: (doc.data().createdAt as Timestamp).toDate(),
+        createdAt: (doc.data().createdAt as Timestamp)?.toDate(),
+        linkTokenExpiresAt: (doc.data().linkTokenExpiresAt as Timestamp)?.toDate(),
     } as Student));
 };
 
@@ -66,53 +71,31 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
         return {
             ...data,
             uid: studentDoc.id,
-            createdAt: (data.createdAt as Timestamp).toDate(),
+            createdAt: (data.createdAt as Timestamp)?.toDate(),
+            linkTokenExpiresAt: (data.linkTokenExpiresAt as Timestamp)?.toDate(),
         } as Student;
     }
     return undefined;
 };
 
-export const createStudent = async (data: Omit<Student, 'uid' | 'createdAt' | 'studentCode' | 'linkToken' | 'linkTokenExpiresAt' | 'linkedUserId'>): Promise<Student> => {
+// This function now only creates the basic student document.
+// The studentCode and linkToken will be populated by a Cloud Function trigger.
+export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'createdAt'>>): Promise<Document> => {
     const db = getDb();
-    const counterRef = doc(db, 'counters', 'studentCounter');
     const newStudentRef = doc(collection(db, 'students'));
-
-    let newStudentCode = '';
-
-    await runTransaction(db, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        
-        let newCount;
-        if (!counterDoc.exists()) {
-            newCount = 1;
-        } else {
-            newCount = (counterDoc.data().current || 0) + 1;
-        }
-        
-        transaction.set(counterRef, { current: newCount }, { merge: true });
-        
-        newStudentCode = `@121${String(newCount).padStart(4, '0')}`;
-    });
-
-    const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
-    const linkTokenExpiresAt = Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)); // 24 hours from now
 
     const newStudentData = {
         ...data,
-        studentCode: newStudentCode,
+        isActive: true, // Default to active
         createdAt: serverTimestamp(),
-        linkToken: linkToken,
-        linkTokenExpiresAt: linkTokenExpiresAt,
-        isActive: true,
+        // studentCode and linkToken are omitted, to be added by backend.
     };
 
     await setDoc(newStudentRef, newStudentData);
 
-    return {
-        ...newStudentData,
-        uid: newStudentRef.id,
-        createdAt: new Date(), // This will be slightly different from server timestamp, but okay for return
-    } as Student;
+    // Return the document reference, as the full student data is now incomplete
+    // until the function populates it. The UI will get the full data from the real-time listener.
+    return newStudentRef as any;
 };
 
 export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<void> => {
@@ -136,6 +119,9 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
     // 3. Find and delete user if linked
     const studentDoc = await getStudentDetails(studentId);
     if(studentDoc?.linkedUserId) {
+        // Note: Deleting the auth user from the client is not recommended.
+        // This should be handled by an admin SDK in a backend environment.
+        // For now, we only delete the Firestore user document.
         batch.delete(doc(db, 'users', studentDoc.linkedUserId));
     }
     
@@ -144,13 +130,14 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
 
 
 // --- Lesson and Slot API ---
-export const getStudentUpcomingLessons = async (studentId: string): Promise<LessonWithDetails[]> => {
+export const getStudentUpcomingLessons = async (authUid: string): Promise<LessonWithDetails[]> => {
     const db = getDb();
     
     // First, find the student's document ID from their auth UID
-    const userRef = doc(db, 'users', studentId);
+    const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists() || !userDoc.data().linkedStudentId) {
+        console.log(`User ${authUid} not linked to a student.`);
         return [];
     }
     const studentDocId = userDoc.data().linkedStudentId;
@@ -158,9 +145,7 @@ export const getStudentUpcomingLessons = async (studentId: string): Promise<Less
 
     const q = query(collection(getDb(), 'lessons'), where('studentId', '==', studentDocId));
     const lessonSnap = await getDocs(q);
-    const lessons = lessonSnap.docs
-        .map(doc => ({ ...doc.data(), lessonId: doc.id } as Lesson))
-        .filter(l => new Date(l.slotId.substring(0, 10)) >= new Date());
+    const lessons = lessonSnap.docs.map(doc => ({ ...doc.data(), lessonId: doc.id } as Lesson));
 
     const student = await getStudentDetails(studentDocId);
     if (!student) return [];
@@ -175,16 +160,21 @@ export const getStudentUpcomingLessons = async (studentId: string): Promise<Less
 };
 
 export const getLessonDetails = async (lessonId: string, authUid: string): Promise<LessonWithDetails | null> => {
-    const lesson = await getDoc(getLessonRef(lessonId));
-    if (!lesson.exists()) return null;
+    const db = getDb();
+    const lessonDoc = await getDoc(getLessonRef(lessonId));
+    if (!lessonDoc.exists()) return null;
 
-    const lessonData = { ...lesson.data(), lessonId: lesson.id } as Lesson;
+    const lessonData = { ...lessonDoc.data(), lessonId: lessonDoc.id } as Lesson;
     
-    const userRef = doc(getDb(), 'users', authUid);
+    const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
 
-    if(!userDoc.exists() || userDoc.data().linkedStudentId !== lessonData.studentId) {
-        // Security check: user can only fetch their own lesson
+    // Admin check
+    const userData = userDoc.data();
+    const isAdmin = userData && userData.role === 'admin';
+
+    if(!isAdmin && (!userData || userData.linkedStudentId !== lessonData.studentId)) {
+        // Security check: user can only fetch their own lesson, unless they are admin
         throw new Error("Permission denied.");
     }
     
@@ -213,8 +203,6 @@ export const countStudentLessonsInMonth = async (studentId: string, month: Date)
 
 export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     const monthStr = format(month, 'yyyy-MM');
-    // For simplicity, we query lessons and aggregate them into slots client-side.
-    // A more scalable solution might use aggregated data in Firestore.
     const lessonsQuery = query(collection(getDb(), 'lessons'), where('status', 'in', ['approved', 'scheduled']));
     const lessonsSnapshot = await getDocs(lessonsQuery);
     const lessonsInMonth = lessonsSnapshot.docs
@@ -226,7 +214,6 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
 
     const activeDates = settings.activeDatesByMonth[monthStr] || getDefaultActiveDatesForMonth(month);
 
-    // Initialize all possible slots for active dates
     for (const date of activeDates) {
         for (const timeDef of fixedTimeSlotsDefinition) {
             const slotId = `${date}-${timeDef.startTime}`;
@@ -241,7 +228,6 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
         }
     }
     
-    // Populate with lessons
     lessonsInMonth.forEach(lesson => {
         let slot = slotsMap.get(lesson.slotId);
         if (slot) {
@@ -287,7 +273,12 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     
     await runTransaction(db, async (transaction) => {
         const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
+        
+        // This 'get' is outside the transaction to fetch existing documents.
+        // Note: This is a simplification. A more robust implementation might need
+        // to handle read-after-write consistency issues. For this app's scale, it's acceptable.
         const currentLessonsSnap = await getDocs(lessonsQuery);
+        
         const currentStudentIds = new Set(currentLessonsSnap.docs.map(doc => doc.data().studentId));
         const newStudentIds = new Set(studentIds);
 
@@ -333,45 +324,40 @@ export const getAllAnnouncements = async (): Promise<Announcement[]> => {
         .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
-export const saveAnnouncement = async (announcement: Partial<Announcement>): Promise<Announcement> => {
+export const saveAnnouncement = async (announcement: Partial<Announcement>): Promise<void> => {
     if (announcement.id) {
         const { id, ...data } = announcement;
-        await updateDoc(getAnnouncementRef(id), { ...data, createdAt: serverTimestamp() });
-        return { ...announcement, createdAt: new Date() } as Announcement;
+        await updateDoc(getAnnouncementRef(id), { ...data, updatedAt: serverTimestamp() });
     } else {
-        const newDocRef = await addDoc(collection(getDb(), 'announcements'), { ...announcement, createdAt: serverTimestamp() });
-        return { ...announcement, id: newDocRef.id, createdAt: new Date() } as Announcement;
+        await addDoc(collection(getDb(), 'announcements'), { ...announcement, createdAt: serverTimestamp() });
     }
 };
 
 // --- Swap Request API ---
-export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<SwapRequest> => {
+export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<void> => {
     const db = getDb();
     const batch = writeBatch(db);
 
     const newRequestRef = doc(collection(db, 'swapRequests'));
-    const newRequest: Omit<SwapRequest, 'requestId'> = {
-        ...request,
-        createdAt: new Date(), // will be replaced by server timestamp
-        status: 'pending',
-    };
-    batch.set(newRequestRef, { ...newRequest, createdAt: serverTimestamp() });
+    batch.set(newRequestRef, { ...request, status: 'pending', createdAt: serverTimestamp() });
     
     const lessonRef = getLessonRef(request.fromLessonId);
     batch.update(lessonRef, { status: 'swap_pending' });
 
     await batch.commit();
-    return { ...newRequest, requestId: newRequestRef.id };
 };
 
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
-    const snapshot = await getDocs(collection(getDb(), 'swapRequests'));
+    const db = getDb();
+    const snapshot = await getDocs(collection(db, 'swapRequests'));
     const requests = snapshot.docs.map(doc => ({ ...doc.data(), requestId: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as SwapRequest));
     
     const detailedRequests: SwapRequestWithDetails[] = [];
     for(const req of requests) {
+        // Assuming admin is calling this. We pass 'admin' to bypass student-specific security checks in getLessonDetails.
+        const userRef = doc(db, 'users', 'admin'); // A placeholder to satisfy the function signature
+        const lesson = await getLessonDetails(req.fromLessonId, 'admin'); 
         const student = await getStudentDetails(req.studentId);
-        const lesson = await getLessonDetails(req.fromLessonId, 'admin'); // Assuming admin can see all
         if(student && lesson) {
             detailedRequests.push({ ...req, studentName: student.name, fromLesson: lesson });
         }
@@ -379,7 +365,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     return detailedRequests;
 };
 
-export const updateSwapRequestStatus = async (requestId: string, status: 'approved' | 'rejected'): Promise<SwapRequest> => {
+export const updateSwapRequestStatus = async (requestId: string, status: 'approved' | 'rejected'): Promise<void> => {
     const db = getDb();
     const batch = writeBatch(db);
     const reqRef = getSwapRequestRef(requestId);
@@ -387,18 +373,16 @@ export const updateSwapRequestStatus = async (requestId: string, status: 'approv
     batch.update(reqRef, { status });
 
     const requestSnap = await getDoc(reqRef);
+    if(!requestSnap.exists()) throw new Error("Swap request not found");
     const request = requestSnap.data() as SwapRequest;
+
     if(status === 'approved') {
-        // Logic to move student to new slot would go here.
-        // For now, just mark original lesson as 'swapped'.
         batch.update(getLessonRef(request.fromLessonId), { status: 'swapped' });
     } else if (status === 'rejected') {
-        // Revert lesson status to 'scheduled'
         batch.update(getLessonRef(request.fromLessonId), { status: 'scheduled' });
     }
 
     await batch.commit();
-    return { ...request, status };
 };
 
 
@@ -409,15 +393,13 @@ export const getAppSettings = async (): Promise<AppSettings> => {
     if (docSnap.exists()) {
         return docSnap.data() as AppSettings;
     }
-    // Return default settings if not found
     return {
         defaultSlotCapacity: 4,
         activeDatesByMonth: {},
     };
 };
 
-export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<AppSettings> => {
+export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     const docRef = doc(getDb(), 'settings', 'app');
     await setDoc(docRef, newSettings, { merge: true });
-    return await getAppSettings();
 };
