@@ -273,6 +273,10 @@ export default function SchedulePage() {
         toast({ title: "エラー", description: message, variant: "destructive" });
     }
   };
+  
+  const handleSlotClick = (slot: TimeSlot) => {
+      setEditingSlot(slot);
+  }
 
   if(loading) return <Loading />;
 
@@ -332,49 +336,34 @@ export default function SchedulePage() {
                       }
                       
                       const slot = daySlots.find(s => s.startTime === timeDef.startTime);
-                      if (!slot) {
-                          const mockSlot: TimeSlot = {
-                              slotId: `${dayString}-${timeDef.startTime}`,
-                              date: dayString,
-                              startTime: timeDef.startTime,
-                              endTime: timeDef.endTime,
-                              capacity: 4,
-                              assignedStudentIds: [],
-                          };
-                          return (
-                             <div key={mockSlot.slotId} className={cn("h-24 border-b p-2 text-xs relative group")}>
-                                <p className="font-semibold">{mockSlot.startTime}</p>
-                                <div className="text-sm">残{mockSlot.capacity}</div>
-                                <p className="text-muted-foreground">0/{mockSlot.capacity}人</p>
-                                <Button
-                                    variant="ghost" size="icon"
-                                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => setEditingSlot(mockSlot)}
-                                >
-                                    <UserPlus className="h-4 w-4" />
-                                </Button>
-                             </div>
-                          )
-                      }
+                      const mockSlot: TimeSlot = slot || {
+                          slotId: `${dayString}-${timeDef.startTime}`,
+                          date: dayString,
+                          startTime: timeDef.startTime,
+                          endTime: timeDef.endTime,
+                          capacity: 4,
+                          assignedStudentIds: [],
+                      };
                       
-                      const occupancy = slot.assignedStudentIds.length;
-                      const capacity = slot.capacity;
+                      const occupancy = mockSlot.assignedStudentIds.length;
+                      const capacity = mockSlot.capacity;
                       const isFull = occupancy >= capacity;
                       const remaining = capacity - occupancy;
                       
                       return (
-                        <div key={slot.slotId} className={cn("h-24 border-b p-2 text-xs relative group flex flex-col")}>
-                          <div className="flex justify-between">
-                            <p className="font-semibold">{slot.startTime}</p>
-                             <div className={cn('text-sm', isFull ? 'text-destructive font-bold' : '')}>
+                        <div key={mockSlot.slotId} 
+                             onClick={() => handleSlotClick(mockSlot)}
+                             className={cn("h-24 border-b p-2 text-xs flex flex-col cursor-pointer hover:bg-muted/50 transition-colors")}>
+                          <div className="flex justify-between items-start">
+                            <p className="font-semibold">{mockSlot.startTime}</p>
+                            <div className={cn('text-sm', isFull ? 'text-destructive font-bold' : '')}>
                                 {isFull ? '満席' : `残${remaining}`}
                             </div>
                           </div>
-                          <p className="text-muted-foreground text-xs">{occupancy}/{capacity}人</p>
                           
                           <ScrollArea className="flex-grow my-1">
                             <div className="space-y-1">
-                                {slot.assignedStudentIds.map(studentId => {
+                                {mockSlot.assignedStudentIds.map(studentId => {
                                     const student = allStudents.find(s => s.uid === studentId);
                                     return (
                                         <div key={studentId} className="bg-muted/50 text-foreground text-[10px] px-1.5 py-0.5 rounded-sm truncate">
@@ -384,14 +373,6 @@ export default function SchedulePage() {
                                 })}
                             </div>
                           </ScrollArea>
-                          
-                          <Button
-                              variant="ghost" size="icon"
-                              className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => setEditingSlot(slot)}
-                          >
-                              <UserPlus className="h-4 w-4" />
-                          </Button>
                         </div>
                       );
                     })}
