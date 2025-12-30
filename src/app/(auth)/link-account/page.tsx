@@ -1,26 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Link, Brush } from 'lucide-react';
+import { Link as LinkIcon } from 'lucide-react';
 import { Loading } from '@/components/shared/Loading';
+import { doc, getDoc } from 'firebase/firestore';
 
 
 export default function LinkAccountPage() {
   const { user, isUserLoading } = useUser();
-  const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
   const [studentCode, setStudentCode] = useState('');
   const [linkToken, setLinkToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
+
+  useEffect(() => {
+    if (!isUserLoading) {
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
+      
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          if (userData.role === 'admin') {
+            router.replace('/admin'); // Admin should not be here
+          } else if (userData.linkedStudentId) {
+            router.replace('/student'); // Already linked
+          } else {
+            setIsLoadingPage(false); // Show the page for unlinked students
+          }
+        } else {
+           router.replace('/login');
+        }
+      });
+    }
+  }, [user, isUserLoading, firestore, router]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +92,7 @@ export default function LinkAccountPage() {
     }
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || isLoadingPage) {
       return <Loading />
   }
 
@@ -74,7 +102,7 @@ export default function LinkAccountPage() {
         <form onSubmit={handleSubmit}>
           <CardHeader className="text-center">
             <div className="mx-auto mb-2 flex items-center justify-center rounded-full bg-primary/10 p-3">
-              <Link className="h-8 w-8 text-primary" />
+              <LinkIcon className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="font-headline text-2xl">アカウント連携</CardTitle>
             <CardDescription>管理者から共有された生徒コードと連携トークンを入力してください。</CardDescription>
@@ -107,8 +135,8 @@ export default function LinkAccountPage() {
             <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
               {isSubmitting ? '連携中...' : 'アカウントを連携'}
             </Button>
-             <Button variant="link" className="text-sm text-muted-foreground" onClick={() => auth.signOut()}>
-                ログアウト
+             <Button variant="link" className="text-sm text-muted-foreground" onClick={() => router.push('/')}>
+                戻る
             </Button>
           </CardFooter>
         </form>

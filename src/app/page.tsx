@@ -19,14 +19,16 @@ export default function Home() {
         getDoc(userDocRef).then(docSnap => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            if (!userData.linkedStudentId) {
-                router.replace('/link-account');
-            } else if (userData.role === 'admin') {
+            if (userData.role === 'admin') {
                 router.replace('/admin');
-            } else {
+            } else if (userData.linkedStudentId) {
                 router.replace('/student');
+            } else {
+                router.replace('/link-account');
             }
           } else {
+             // This can happen briefly after signup before the user doc is created.
+             // Let's redirect to login as a safe fallback.
              router.replace('/login');
           }
         }).catch(() => {
