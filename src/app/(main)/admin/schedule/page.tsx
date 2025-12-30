@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Card } from '@/components/ui/card';
 
 
 const courseMap: { [key in Student['course']]: { name: string; limit: number } } = {
@@ -127,11 +128,15 @@ export function EditSlotDialog({
       if (!isNowSelected && isOriginallyInSlot) return currentCount - 1;
       return currentCount;
   }
+  
+  const sortedStudents = useMemo(() => {
+    return allStudents.filter(s => s.isActive).sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+  }, [allStudents]);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>生徒の割り当て</DialogTitle>
             <DialogDescription>
@@ -143,37 +148,41 @@ export function EditSlotDialog({
               <p className="text-sm font-medium">定員: {selectedStudentIds.length} / {capacity}</p>
               {isOverCapacity && <Badge variant="destructive">定員オーバー</Badge>}
             </div>
-            {allStudents.filter(s => s.isActive).map(student => {
-              const limit = courseMap[student.course].limit;
-              const projectedCount = getProjectedCount(student);
-              const isOverLimit = projectedCount > limit;
-              const isPreferredSlot = student.preferredSlot.enabled && student.preferredSlot.slotKey === slot?.startTime;
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {sortedStudents.map(student => {
+                const limit = courseMap[student.course].limit;
+                const projectedCount = getProjectedCount(student);
+                const isOverLimit = projectedCount > limit;
+                const isSelected = selectedStudentIds.includes(student.uid);
+                const isPreferredSlot = student.preferredSlot.enabled && student.preferredSlot.slotKey === slot?.startTime;
 
-              return (
-                <div key={student.uid} className="flex items-center justify-between space-x-2 pr-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`student-${student.uid}-${slot?.slotId}`}
-                      checked={selectedStudentIds.includes(student.uid)}
-                      onCheckedChange={(checked) => {
+                return (
+                    <Card
+                      key={student.uid}
+                      onClick={() => {
                         setSelectedStudentIds(prev =>
-                          checked ? [...prev, student.uid] : prev.filter(id => id !== student.uid)
+                          isSelected ? prev.filter(id => id !== student.uid) : [...prev, student.uid]
                         );
                       }}
-                    />
-                    <Label htmlFor={`student-${student.uid}-${slot?.slotId}`} className="flex items-center gap-2">
-                      {isPreferredSlot && <Star className="h-4 w-4 text-yellow-500 fill-yellow-400" />}
-                      <span>{student.name}</span>
-                      <Badge variant="outline" className="font-normal">{courseMap[student.course].name}</Badge>
-                      <span className={cn('text-xs', isOverLimit ? 'text-destructive font-bold' : 'text-muted-foreground')}>
-                        (今月{projectedCount}/{limit})
-                      </span>
-                    </Label>
-                  </div>
-                  {isOverLimit && <AlertCircle className="h-4 w-4 text-destructive" />}
-                </div>
-              );
-            })}
+                      className={cn(
+                        "p-3 flex flex-col justify-between cursor-pointer transition-all",
+                        isSelected ? "ring-2 ring-primary bg-primary/10" : "bg-muted/40 hover:bg-muted"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-semibold text-sm pr-2">{student.name}</span>
+                        {isPreferredSlot && <Star className="h-4 w-4 text-yellow-500 fill-yellow-400 shrink-0" />}
+                      </div>
+                      <div className="flex justify-between items-end mt-2">
+                        <Badge variant="outline" className="font-normal text-xs">{courseMap[student.course].name}</Badge>
+                        <span className={cn('text-xs', isOverLimit ? 'text-destructive font-bold' : 'text-muted-foreground')}>
+                          今月 {projectedCount}/{limit}
+                        </span>
+                      </div>
+                    </Card>
+                );
+              })}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>キャンセル</Button>

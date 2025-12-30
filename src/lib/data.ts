@@ -341,11 +341,30 @@ export const countStudentLessonsInMonth = async (studentId: string, month: Date)
 export const updateSlotAssignments = async (slotId: string, studentIds: string[]): Promise<TimeSlot> => {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            const slotIndex = slots.findIndex(s => s.slotId === slotId);
-            if (slotIndex === -1) return reject(new Error("Slot not found"));
-            
-            const slot = slots[slotIndex];
-            if (studentIds.length > slot.capacity) return reject(new Error("Capacity exceeded"));
+            let slot = slots.find(s => s.slotId === slotId);
+
+            // If slot doesn't exist, create it.
+            if (!slot) {
+                const [date, startTime] = slotId.split('-');
+                const timeDef = fixedTimeSlotsDefinition.find(t => t.startTime === startTime);
+                if (!date || !timeDef) {
+                    return reject(new Error("Invalid slotId format."));
+                }
+                const newSlot: TimeSlot = {
+                    slotId,
+                    date,
+                    startTime: timeDef.startTime,
+                    endTime: timeDef.endTime,
+                    capacity: appSettings.defaultSlotCapacity,
+                    assignedStudentIds: [],
+                };
+                slots.push(newSlot);
+                slot = newSlot;
+            }
+
+            if (studentIds.length > slot.capacity) {
+                return reject(new Error("Capacity exceeded"));
+            }
 
             const oldStudentIds = new Set(slot.assignedStudentIds);
             const newStudentIds = new Set(studentIds);
@@ -373,8 +392,8 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
                 }
             });
 
-            slots[slotIndex].assignedStudentIds = studentIds;
-            resolve(slots[slotIndex]);
+            slot.assignedStudentIds = studentIds;
+            resolve(slot);
         }, FAKE_DELAY);
     });
 };
