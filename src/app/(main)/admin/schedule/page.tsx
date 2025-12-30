@@ -322,7 +322,7 @@ export default function SchedulePage() {
               const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
               
               return (
-                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0 w-40", !isActive && "bg-muted/30")}>
+                <div key={day.toString()} className={cn("flex flex-col border-r last:border-r-0 w-32", !isActive && "bg-muted/30")}>
                   <Link href={isActive ? `/admin/day/${dayString}` : '#'} className={cn("block", isActive && "hover:bg-muted/50", !isActive && "cursor-not-allowed")}>
                     <div className={cn("p-3 text-center border-b font-semibold", isSunday(day) ? "text-destructive" : "", !isActive && "text-muted-foreground")}>
                       <p>{format(day, 'd')}</p>
