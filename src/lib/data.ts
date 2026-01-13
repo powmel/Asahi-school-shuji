@@ -431,3 +431,84 @@ export const updateAppSettings = async (newSettings: Partial<AppSettings>): Prom
     const docRef = doc(getDb(), 'settings', 'app');
     await setDoc(docRef, newSettings, { merge: true });
 };
+
+// --- Lesson Move API (Student Self-Service) ---
+
+/**
+ * 生徒が自分のレッスンを別のスロットに移動する（API Route経由）
+ * @param lessonId 移動するレッスンのID
+ * @param targetSlotId 移動先のslotId（形式: "YYYY-MM-DD-HH:mm"）
+ * @param authUid 認証ユーザーのUID（IDトークン取得用）
+ * @throws Error 権限エラー、定員超過、二重予約、その他のエラー
+ */
+export const moveLessonToSlot = async (
+    lessonId: string,
+    targetSlotId: string,
+    authUid: string
+): Promise<void> => {
+    // IDトークンを取得するためにFirebase Authを使う必要がある
+    // この関数はクライアント側から呼ばれるため、user.getIdToken()を呼び出し側で実行する必要がある
+    // しかし、関数シグネチャを簡潔にするため、ここではIDトークンを受け取る形にする
+    // 実際の呼び出しはMoveLessonDialogコンポーネントで行う
+    throw new Error('moveLessonToSlot should be called with ID token. Use the API route directly or use the helper function in the component.');
+};
+
+/**
+ * moveLessonToSlotのヘルパー関数（IDトークンを受け取る）
+ * @param lessonId 移動するレッスンのID
+ * @param targetSlotId 移動先のslotId
+ * @param idToken Firebase Auth IDトークン
+ */
+export const moveLessonToSlotWithToken = async (
+    lessonId: string,
+    targetSlotId: string,
+    idToken: string
+): Promise<void> => {
+    const response = await fetch('/api/move-lesson', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ lessonId, targetSlotId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || 'レッスンの移動に失敗しました。');
+    }
+};
+
+/**
+ * レッスン移動用の空きスロット一覧を取得（API Route経由）
+ * 生徒が見ても問題ない情報のみ返す（残席数、日時情報のみ）
+ * @param excludeSlotId 除外するslotId（移動元のslotId）
+ * @param month 取得する月（Dateオブジェクト）
+ * @param idToken Firebase Auth IDトークン
+ * @returns 空きスロット情報（残席数付き）
+ */
+export const getAvailableSlotsForMove = async (
+    excludeSlotId: string,
+    month: Date,
+    idToken: string
+): Promise<Array<TimeSlot & { availableSeats: number }>> => {
+    const monthStr = format(month, 'yyyy-MM');
+    
+    const response = await fetch('/api/available-slots', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ excludeSlotId, month: monthStr }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || '空きスロットの取得に失敗しました。');
+    }
+
+    return data;
+};
