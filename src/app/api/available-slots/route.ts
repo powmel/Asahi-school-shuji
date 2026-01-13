@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { format } from 'date-fns';
@@ -19,112 +20,75 @@ export async function POST(request: Request) {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
 
-    // ユーザー情報を確認（ログイン確認用）
     const userRef = adminDb.collection('users').doc(uid);
     const userDoc = await userRef.get();
     
-    if (!userDoc.exists) {
+    if (!userDoc.exists()) {
       return NextResponse.json({ error: 'ユーザーが見つかりません。' }, { status: 401 });
     }
 
-    // monthをDateオブジェクトに変換（YYYY-MM形式を想定）
-    const monthDate = new Date(month + '-01');
+    const monthDate = new Date(month + '-01T00:00:00Z');
     if (isNaN(monthDate.getTime())) {
       return NextResponse.json({ error: '無効な月の形式です。' }, { status: 400 });
     }
 
     const monthStr = format(monthDate, 'yyyy-MM');
 
-    // settings/appからdefaultSlotCapacityを取得
     const settingsDocRef = adminDb.collection('settings').doc('app');
     const settingsDoc = await settingsDocRef.get();
     const settings = settingsDoc.exists ? settingsDoc.data() : { defaultSlotCapacity: 4 };
     const defaultCapacity = settings?.defaultSlotCapacity || 4;
 
-    // timeSlotsコレクションから対象月のスロットを取得
-    const timeSlotsQuery = adminDb.collection('timeSlots')
-      .where('date', '>=', monthStr + '-01')
-      .where('date', '<', monthStr + '-32'); // 次の月の1日より小さい（実質的に当月のみ）
-    const timeSlotsSnapshot = await timeSlotsQuery.get();
+    const lessonsQuery = adminDb.collection('lessons')
+      .where('status', 'in', ['approved', 'scheduled']);
+      
+    const lessonsSnapshot = await lessonsQuery.get();
     
-    // slotIdsを配列化し、メタデータマップを構築
-    const slotIds: string[] = [];
-    const slotMetadataMap: Map<string, {
-      date: string;
-      startTime: string;
-      endTime: string;
-      capacity: number;
-    }> = new Map();
+    const lessonsInMonth = lessonsSnapshot.docs
+        .map(doc => doc.data())
+        .filter(lesson => lesson.slotId.startsWith(monthStr));
 
-    timeSlotsSnapshot.docs.forEach(doc => {
-      const timeSlot = doc.data();
-      const slotId = timeSlot.slotId || doc.id;
-      
-      // 移動元のslotIdは除外
-      if (slotId === excludeSlotId) return;
-      
-      slotIds.push(slotId);
-      slotMetadataMap.set(slotId, {
-        date: timeSlot.date || '',
-        startTime: timeSlot.startTime || '',
-        endTime: timeSlot.endTime || '',
-        capacity: timeSlot.capacity || defaultCapacity,
-      });
+    const occupancyMap = new Map<string, number>();
+    lessonsInMonth.forEach(lesson => {
+        occupancyMap.set(lesson.slotId, (occupancyMap.get(lesson.slotId) || 0) + 1);
     });
 
-    // slotIdsを10件ずつに分割（Firestore 'in'制限は10件）
-    const chunkSize = 10;
-    const slotIdChunks: string[][] = [];
-    for (let i = 0; i < slotIds.length; i += chunkSize) {
-      slotIdChunks.push(slotIds.slice(i, i + chunkSize));
-    }
+    const activeDates = (settings?.activeDatesByMonth?.[monthStr] || []) as string[];
 
-    // 各chunkについてlessonsを取得して集計
-    const slotCountMap = new Map<string, number>();
-    
-    for (const chunk of slotIdChunks) {
-      if (chunk.length === 0) continue;
-      
-      const lessonsQuery = adminDb.collection('lessons')
-        .where('slotId', 'in', chunk)
-        .where('status', 'in', ['approved', 'scheduled']);
-      const lessonsSnapshot = await lessonsQuery.get();
-      
-      // slotIdごとの件数を集計（studentIdの重複は無視せず、lesson件数でカウント）
-      lessonsSnapshot.docs.forEach(doc => {
-        const lesson = doc.data();
-        const slotId = lesson.slotId;
-        if (slotId) {
-          slotCountMap.set(slotId, (slotCountMap.get(slotId) || 0) + 1);
-        }
-      });
-    }
+    const fixedTimeSlotsDefinition = [
+        { startTime: '10:00', endTime: '10:50' },
+        { startTime: '11:00', endTime: '11:50' },
+        { startTime: '13:00', endTime: '13:50' },
+        { startTime: '14:00', endTime: '14:50' },
+        { startTime: '15:00', endTime: '15:50' },
+    ];
 
-    // 残席数を計算して返す（生徒情報は含めない）
-    const result = slotIds
-      .map(slotId => {
-        const metadata = slotMetadataMap.get(slotId);
-        if (!metadata) return null;
-        
-        const count = slotCountMap.get(slotId) || 0;
-        const availableSeats = metadata.capacity - count;
-        
-        return {
-          slotId,
-          date: metadata.date,
-          startTime: metadata.startTime,
-          endTime: metadata.endTime,
-          capacity: metadata.capacity,
-          availableSeats,
-        };
-      })
-      .filter((slot): slot is NonNullable<typeof slot> => slot !== null && slot.availableSeats > 0) // 空きがあるもののみ
-      .sort((a, b) => {
-        // 日付順、時間順でソート
+    const result = activeDates.flatMap(date => {
+        return fixedTimeSlotsDefinition.map(timeDef => {
+            const slotId = `${date}-${timeDef.startTime}`;
+            if (slotId === excludeSlotId) return null;
+
+            const occupancy = occupancyMap.get(slotId) || 0;
+            const availableSeats = defaultCapacity - occupancy;
+            
+            if (availableSeats <= 0) return null;
+
+            return {
+              slotId,
+              date: date,
+              startTime: timeDef.startTime,
+              endTime: timeDef.endTime,
+              capacity: defaultCapacity,
+              availableSeats,
+            };
+        });
+    })
+    .filter((slot): slot is NonNullable<typeof slot> => slot !== null)
+    .sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare !== 0) return dateCompare;
         return a.startTime.localeCompare(b.startTime);
-      });
+    });
 
     return NextResponse.json(result, { status: 200 });
 

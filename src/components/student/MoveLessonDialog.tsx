@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -92,7 +93,9 @@ export function MoveLessonDialog({
                 </DialogHeader>
                 
                 {loading ? (
-                    <Loading />
+                    <div className="flex justify-center items-center h-48">
+                        <Loading />
+                    </div>
                 ) : (
                     <div className="space-y-2 py-4">
                         {slots.length === 0 ? (
@@ -106,7 +109,7 @@ export function MoveLessonDialog({
                                     onClick={() => setSelectedSlotId(slot.slotId)}
                                     className={`w-full p-4 border rounded-lg text-left transition-colors ${
                                         selectedSlotId === slot.slotId
-                                            ? 'border-primary bg-primary/5'
+                                            ? 'border-primary bg-primary/5 ring-2 ring-primary'
                                             : 'hover:bg-muted'
                                     }`}
                                 >
@@ -134,7 +137,7 @@ export function MoveLessonDialog({
                         キャンセル
                     </Button>
                     <Button onClick={handleMove} disabled={!selectedSlotId || moving}>
-                        {moving ? '移動中...' : '移動する'}
+                        {moving ? '移動中...' : 'この日時に移動する'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

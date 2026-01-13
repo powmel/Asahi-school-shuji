@@ -27,8 +27,8 @@ import { initializeFirebase } from '@/firebase';
 // This function ensures that Firestore is initialized before we try to use it.
 export const getDb = () => {
     // This function will be called within other functions, ensuring app is initialized.
-    const app = initializeFirebase().firebaseApp;
-    return getFirestore(app);
+    const { firestore } = initializeFirebase();
+    return firestore;
 };
 
 export const fixedTimeSlotsDefinition = [
@@ -79,7 +79,6 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
     return undefined;
 };
 
-// This function now handles code and token generation directly.
 export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'createdAt'>>): Promise<string> => {
     const db = getDb();
     
@@ -91,14 +90,16 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
             let newCount;
             if (!counterSnap.exists()) {
                 newCount = 1;
+                transaction.set(counterRef, { current: newCount });
             } else {
                 newCount = counterSnap.data().current + 1;
+                transaction.update(counterRef, { current: newCount });
             }
 
             const studentCode = `@121${String(newCount).padStart(4, '0')}`;
             const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
             const linkTokenExpiresAt = new Date();
-            linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7); // Token valid for 7 days
+            linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7);
 
             const newStudentRef = doc(collection(db, 'students'));
 
@@ -110,12 +111,6 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
                 isActive: data.isActive ?? true,
                 createdAt: serverTimestamp(),
             });
-
-            if (!counterSnap.exists()) {
-                transaction.set(counterRef, { current: newCount });
-            } else {
-                transaction.update(counterRef, { current: newCount });
-            }
             
             return newStudentRef.id;
         });
@@ -124,13 +119,11 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
 
     } catch (e) {
         console.error("Transaction failed: ", e);
-        // Re-throw the original error to be caught by the UI
         throw e;
     }
 };
 
 export const updateStudent = async (studentId: string, data: Partial<Student>): Promise<void> => {
-    // Prevent sensitive fields from being updated directly through this function
     const { uid, studentCode, linkedUserId, ...updateData } = data;
     return await updateDoc(getStudentRef(studentId), updateData);
 };
@@ -139,20 +132,14 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
     const db = getDb();
     const batch = writeBatch(db);
 
-    // 1. Delete student document
     batch.delete(getStudentRef(studentId));
 
-    // 2. Find and delete all lessons for that student
     const lessonsQuery = query(collection(db, 'lessons'), where('studentId', '==', studentId));
     const lessonsSnapshot = await getDocs(lessonsQuery);
     lessonsSnapshot.forEach(doc => batch.delete(doc.ref));
 
-    // 3. Find and delete user if linked
     const studentDoc = await getStudentDetails(studentId);
     if(studentDoc?.linkedUserId) {
-        // Note: Deleting the auth user from the client is not recommended.
-        // This should be handled by an admin SDK in a backend environment.
-        // For now, we only delete the Firestore user document.
         batch.delete(doc(db, 'users', studentDoc.linkedUserId));
     }
     
@@ -164,11 +151,9 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
 export const getStudentUpcomingLessons = async (authUid: string): Promise<LessonWithDetails[]> => {
     const db = getDb();
     
-    // First, find the student's document ID from their auth UID
     const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists() || !userDoc.data().linkedStudentId) {
-        console.log(`User ${authUid} not linked to a student.`);
         return [];
     }
     const studentDocId = userDoc.data().linkedStudentId;
@@ -200,12 +185,10 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
     const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
 
-    // Admin check
     const userData = userDoc.data();
     const isAdmin = userData && userData.role === 'admin';
 
-    if(!isAdmin && (!userData || userData.linkedStudentId !== lessonData.studentId)) {
-        // Security check: user can only fetch their own lesson, unless they are admin
+    if(!isAdmin && (!userDoc.exists() || !userData || userData.linkedStudentId !== lessonData.studentId)) {
         throw new Error("Permission denied.");
     }
     
@@ -303,7 +286,7 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     const db = getDb();
     
     await runTransaction(db, async (transaction) => {
-        const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
+        const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId), where('status', 'in', ['approved', 'scheduled']));
         
         const currentLessonsSnap = await getDocs(lessonsQuery);
         
@@ -382,9 +365,8 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     const detailedRequests: SwapRequestWithDetails[] = [];
     for(const req of requests) {
-        // Assuming admin is calling this. We pass 'admin' to bypass student-specific security checks in getLessonDetails.
-        const userRef = doc(db, 'users', 'admin'); // A placeholder to satisfy the function signature
-        const lesson = await getLessonDetails(req.fromLessonId, 'admin'); 
+        const user = { uid: 'admin' };
+        const lesson = await getLessonDetails(req.fromLessonId, user.uid); 
         const student = await getStudentDetails(req.studentId);
         if(student && lesson) {
             detailedRequests.push({ ...req, studentName: student.name, fromLesson: lesson });
@@ -434,31 +416,6 @@ export const updateAppSettings = async (newSettings: Partial<AppSettings>): Prom
 
 // --- Lesson Move API (Student Self-Service) ---
 
-/**
- * 生徒が自分のレッスンを別のスロットに移動する（API Route経由）
- * @param lessonId 移動するレッスンのID
- * @param targetSlotId 移動先のslotId（形式: "YYYY-MM-DD-HH:mm"）
- * @param authUid 認証ユーザーのUID（IDトークン取得用）
- * @throws Error 権限エラー、定員超過、二重予約、その他のエラー
- */
-export const moveLessonToSlot = async (
-    lessonId: string,
-    targetSlotId: string,
-    authUid: string
-): Promise<void> => {
-    // IDトークンを取得するためにFirebase Authを使う必要がある
-    // この関数はクライアント側から呼ばれるため、user.getIdToken()を呼び出し側で実行する必要がある
-    // しかし、関数シグネチャを簡潔にするため、ここではIDトークンを受け取る形にする
-    // 実際の呼び出しはMoveLessonDialogコンポーネントで行う
-    throw new Error('moveLessonToSlot should be called with ID token. Use the API route directly or use the helper function in the component.');
-};
-
-/**
- * moveLessonToSlotのヘルパー関数（IDトークンを受け取る）
- * @param lessonId 移動するレッスンのID
- * @param targetSlotId 移動先のslotId
- * @param idToken Firebase Auth IDトークン
- */
 export const moveLessonToSlotWithToken = async (
     lessonId: string,
     targetSlotId: string,
@@ -480,14 +437,6 @@ export const moveLessonToSlotWithToken = async (
     }
 };
 
-/**
- * レッスン移動用の空きスロット一覧を取得（API Route経由）
- * 生徒が見ても問題ない情報のみ返す（残席数、日時情報のみ）
- * @param excludeSlotId 除外するslotId（移動元のslotId）
- * @param month 取得する月（Dateオブジェクト）
- * @param idToken Firebase Auth IDトークン
- * @returns 空きスロット情報（残席数付き）
- */
 export const getAvailableSlotsForMove = async (
     excludeSlotId: string,
     month: Date,

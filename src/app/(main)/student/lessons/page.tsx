@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -40,15 +41,18 @@ export default function AllLessonsPage() {
 
   const loadLessons = () => {
     if (user) {
+      setLoading(true);
       getStudentUpcomingLessons(user.uid).then(data => {
-        setLessons(data.sort((a, b) => new Date(b.slotDate).getTime() - new Date(a.slotDate).getTime()));
+        setLessons(data.sort((a, b) => new Date(a.slotDate).getTime() - new Date(b.slotDate).getTime()));
         setLoading(false);
       });
     }
   };
 
   useEffect(() => {
-    loadLessons();
+    if (user) {
+      loadLessons();
+    }
   }, [user]);
 
   const handleMoveClick = (lessonId: string, slotId: string, e: React.MouseEvent) => {
