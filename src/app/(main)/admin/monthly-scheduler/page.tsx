@@ -289,23 +289,18 @@ export default function MonthlySchedulerPage() {
   const assignStudent = async (studentId: string, dateOrSlotId: string) => {
     const student = studentsWithUsage.find(s => s.uid === studentId);
     if (!student) return;
-
-    const isSlotId = dateOrSlotId.includes(':');
-    const targetDate = isSlotId ? allSlots.find(s => s.slotId === dateOrSlotId)?.date : dateOrSlotId;
-
-    if (!targetDate) {
-      toast({ title: "エラー", description: "有効な日付またはスロットではありません。", variant: "destructive" });
-      return;
+    
+    const { limit } = courseMap[student.course];
+    const currentUsage = student.usage;
+    
+    if (currentUsage >= limit) {
+        toast({ title: "上限到達", description: `${student.name}さんは今月の上限回数に達しています。`, variant: "destructive" });
+        return;
     }
 
-    const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
+    const isSlotId = dateOrSlotId.includes(':');
 
-    const isSameDate = originalSlot?.date === targetDate;
-    const isNewAssignmentToMonth = !originalSlot;
-    const effectiveUsage = isNewAssignmentToMonth ? student.usage + 1 : student.usage;
-
-    const { limit } = courseMap[student.course];
-    if (effectiveUsage > limit && !isSameDate) {
+    if (currentUsage + 1 > limit) {
       setStudentToConfirm(student);
       setAssignmentAction(() => () => {
         if (isSlotId) {
@@ -328,7 +323,7 @@ export default function MonthlySchedulerPage() {
 
   const assignStudentToFirstAvailableSlot = async (studentId: string, date: string) => {
     const dateSlots = allSlots.filter(s => s.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
-    const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity);
+    const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity && !s.assignedStudentIds.includes(studentId));
 
     if (availableSlot) {
       await handleAssignment(studentId, availableSlot.slotId, true);
@@ -361,28 +356,15 @@ export default function MonthlySchedulerPage() {
             }
         }
         
-        // Find and remove from the old slot within the current month if it's a move
-        const originalSlot = allSlots.find(s => s.assignedStudentIds.includes(studentId) && s.date.startsWith(format(currentMonth, 'yyyy-MM')));
-        
-        if (originalSlot && originalSlot.slotId !== slotId) {
-            await updateSlotAssignments(originalSlot.slotId, originalSlot.assignedStudentIds.filter(id => id !== studentId));
-        }
-
-        // Determine the new list of students for the target slot
         let newTargetStudentIds: string[];
         if (assign) {
-            // Add student if not already present
             newTargetStudentIds = Array.from(new Set([...targetSlot.assignedStudentIds, studentId]));
         } else {
-            // Remove student
             newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
         }
 
-        // Update the target slot only if it's different from the original slot or if it's an unassignment
-        if (!originalSlot || originalSlot.slotId !== slotId || !assign) {
-             await updateSlotAssignments(slotId, newTargetStudentIds);
-        }
-
+        await updateSlotAssignments(slotId, newTargetStudentIds);
+        
         await fetchData(currentMonth); // Re-fetch all data to ensure consistency
         toast({ title: "成功", description: `割り当てを更新しました。` });
 
@@ -518,4 +500,5 @@ export default function MonthlySchedulerPage() {
   );
 }
 
+    
     
