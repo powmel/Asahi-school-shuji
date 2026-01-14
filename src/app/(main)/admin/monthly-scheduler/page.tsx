@@ -222,8 +222,14 @@ export default function MonthlySchedulerPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isSlotPanelOpen, setIsSlotPanelOpen] = useState(false);
-  const [studentToConfirm, setStudentToConfirm] = useState<Student | null>(null);
-  const [assignmentAction, setAssignmentAction] = useState<(() => void) | null>(null);
+  
+  const [confirmationState, setConfirmationState] = useState<{
+    type: 'over-limit' | 'move';
+    student: Student;
+    action: () => void;
+    message: string;
+  } | null>(null);
+
   const { toast } = useToast();
 
   const studentsWithUsage = useMemo((): StudentWithUsage[] => {
@@ -293,37 +299,81 @@ export default function MonthlySchedulerPage() {
     const { limit } = courseMap[student.course];
     const currentUsage = student.usage;
     
-    if (currentUsage >= limit) {
-        toast({ title: "上限到達", description: `${student.name}さんは今月の上限回数に達しています。`, variant: "destructive" });
+    const isSlotId = dateOrSlotId.includes(':');
+
+    // Logic for adding a new lesson
+    if (currentUsage < limit) {
+        if (currentUsage + 1 > limit) {
+          // This is the assignment that will hit the limit
+          setConfirmationState({
+            type: 'over-limit',
+            student,
+            message: `「${student.name}」さんは${courseMap[student.course].name}ですが、この割り当てを行うと今月${currentUsage + 1}回目になります。続行しますか？`,
+            action: () => {
+                if (isSlotId) {
+                    handleAssignment(studentId, dateOrSlotId, true);
+                } else {
+                    assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+                }
+                setIsSlotPanelOpen(false);
+            },
+          });
+        } else {
+            // Normal assignment
+            if (isSlotId) {
+                await handleAssignment(studentId, dateOrSlotId, true);
+                setIsSlotPanelOpen(false);
+            } else {
+                await assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
+            }
+        }
+    } else {
+        // Logic for moving a lesson when at limit
+        const date = isSlotId ? dateOrSlotId.substring(0, 10) : dateOrSlotId;
+        const studentSlots = allSlots.filter(s => s.assignedStudentIds.includes(studentId));
+        if (studentSlots.some(s => s.date === date)) {
+            toast({ title: "重複", description: "この生徒は既にこの日に予約があります。", variant: "default" });
+            return;
+        }
+
+        setConfirmationState({
+            type: 'move',
+            student,
+            message: `「${student.name}」さんは上限に達しています。最も古い予約をこの日に移動しますか？`,
+            action: async () => {
+                const newDate = isSlotId ? dateOrSlotId.substring(0, 10) : dateOrSlotId;
+                await moveOldestLessonToNewDate(studentId, newDate);
+            }
+        });
+    }
+  };
+  
+  const moveOldestLessonToNewDate = async (studentId: string, newDate: string) => {
+      const studentLessons = allSlots.filter(slot => slot.assignedStudentIds.includes(studentId)).sort((a,b) => a.date.localeCompare(b.date));
+      if (studentLessons.length === 0) {
+          toast({ title: "エラー", description: "移動元のレッスンが見つかりません。", variant: "destructive" });
+          return;
+      }
+      const oldestSlot = studentLessons[0];
+      
+      // Unassign from the oldest slot
+      const newOldSlotIds = oldestSlot.assignedStudentIds.filter(id => id !== studentId);
+      await updateSlotAssignments(oldestSlot.slotId, newOldSlotIds);
+
+      // Assign to the first available slot on the new date
+      await assignStudentToFirstAvailableSlot(studentId, newDate, false);
+      toast({ title: "成功", description: "レッスンを移動しました。" });
+  }
+
+  const assignStudentToFirstAvailableSlot = async (studentId: string, date: string, checkExisting: boolean = true) => {
+    const dateSlots = allSlots.filter(s => s.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    if (checkExisting && dateSlots.some(s => s.assignedStudentIds.includes(studentId))) {
+        toast({ title: "重複", description: "この生徒は既にこの日に予約があります。", variant: "default" });
         return;
     }
 
-    const isSlotId = dateOrSlotId.includes(':');
-
-    if (currentUsage + 1 > limit) {
-      setStudentToConfirm(student);
-      setAssignmentAction(() => () => {
-        if (isSlotId) {
-          handleAssignment(studentId, dateOrSlotId, true);
-        } else {
-          assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
-        }
-        setIsSlotPanelOpen(false);
-      });
-      return;
-    }
-
-    if (isSlotId) {
-      await handleAssignment(studentId, dateOrSlotId, true);
-      setIsSlotPanelOpen(false);
-    } else {
-      await assignStudentToFirstAvailableSlot(studentId, dateOrSlotId);
-    }
-  };
-
-  const assignStudentToFirstAvailableSlot = async (studentId: string, date: string) => {
-    const dateSlots = allSlots.filter(s => s.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
-    const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity && !s.assignedStudentIds.includes(studentId));
+    const availableSlot = dateSlots.find(s => s.assignedStudentIds.length < s.capacity);
 
     if (availableSlot) {
       await handleAssignment(studentId, availableSlot.slotId, true);
@@ -333,12 +383,11 @@ export default function MonthlySchedulerPage() {
     setSelectedStudentId(null);
   }
 
-  const handleConfirmOverLimit = () => {
-    if (assignmentAction) {
-      assignmentAction();
+  const handleConfirm = () => {
+    if (confirmationState) {
+      confirmationState.action();
     }
-    setStudentToConfirm(null);
-    setAssignmentAction(null);
+    setConfirmationState(null);
   };
 
   const handleAssignment = async (studentId: string, slotId: string, assign: boolean) => {
@@ -346,8 +395,13 @@ export default function MonthlySchedulerPage() {
         const student = allStudents.find(s => s.uid === studentId);
         if (!student) throw new Error("Student not found");
 
-        const targetSlot = allSlots.find(s => s.slotId === slotId);
-        if (!targetSlot) throw new Error("Slot not found");
+        const targetSlot = allSlots.find(s => s.slotId === slotId) || {
+            slotId: slotId,
+            date: slotId.substring(0, 10),
+            startTime: slotId.substring(11),
+            capacity: appSettings?.defaultSlotCapacity || 4,
+            assignedStudentIds: []
+        };
         
         if (assign) {
             if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
@@ -481,17 +535,19 @@ export default function MonthlySchedulerPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!studentToConfirm} onOpenChange={(open) => !open && setStudentToConfirm(null)}>
+      <AlertDialog open={!!confirmationState} onOpenChange={(open) => !open && setConfirmationState(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
+            <AlertDialogTitle>
+                {confirmationState?.type === 'move' ? 'レッスン移動の確認' : '月間上限超過の確認'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {studentToConfirm && `「${studentToConfirm.name}」さんは${courseMap[studentToConfirm.course].name}ですが、この割り当てを行うと今月${(studentUsage[studentToConfirm.uid] || 0) + 1}回目になります。続行しますか？`}
+              {confirmationState?.message}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setStudentToConfirm(null)}>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmOverLimit}>続行する</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setConfirmationState(null)}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>続行する</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -499,6 +555,7 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
-
     
+    
+
     
