@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -196,7 +195,7 @@ export function EditSlotDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription asChild>
               <div>
                 <div>以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？</div>
                 <ul className="mt-2 list-disc list-inside">
@@ -394,5 +393,3 @@ export default function SchedulePage() {
     </TooltipProvider>
   );
 }
-
-    

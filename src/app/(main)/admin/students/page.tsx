@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -110,7 +108,9 @@ function PreferredSlotDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>授業時間指定</DialogTitle>
-                    <DialogDescription>{student.name}さんの希望日時を設定します。有効にすると、空きがある場合に自動で予約が確保されます。</DialogDescription>
+                    <DialogDescription>
+                        {student.name}さんの希望日時を設定します。有効にすると、空きがある場合に自動で予約が確保されます。
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-6">
                     <div className="flex items-center space-x-2">
@@ -343,7 +343,7 @@ function StudentSheet({
                                <AlertDialogContent>
                                    <AlertDialogHeader>
                                        <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                                       <AlertDialogDescription>
+                                       <AlertDialogDescription asChild>
                                           <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
                                        </AlertDialogDescription>
                                    </AlertDialogHeader>
@@ -522,7 +522,7 @@ export default function StudentsPage() {
                            <AlertDialogContent>
                                <AlertDialogHeader>
                                    <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                                   <AlertDialogDescription>
+                                   <AlertDialogDescription asChild>
                                       <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
                                    </AlertDialogDescription>
                                </AlertDialogHeader>
@@ -560,6 +560,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-
-
-    
