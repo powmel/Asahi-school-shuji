@@ -1,5 +1,4 @@
 
-
 'use client';
 import {
     getFirestore,
@@ -96,7 +95,8 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
                 transaction.update(counterRef, { current: newCount });
             }
 
-            const studentCode = `@121${String(newCount).padStart(4, '0')}`;
+            // より直感的な接頭辞 '@std' に変更
+            const studentCode = `@std${String(newCount).padStart(4, '0')}`;
             const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
             const linkTokenExpiresAt = new Date();
             linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7);

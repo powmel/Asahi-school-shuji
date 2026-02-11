@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -200,22 +201,19 @@ function StudentSheet({
         try {
             if (isNew) {
                 await createStudent(formData);
-                toast({ title: '成功', description: '新しい生徒が追加されました。コードとトークンが生成されるまで少しお待ちください。'});
-                onOpenChange(false); // Close sheet on success
+                toast({ title: '成功', description: '新しい生徒が追加されました。'});
+                onOpenChange(false);
             } else if(student?.uid) {
                 await updateStudent(student.uid, formData);
                 toast({ title: '成功', description: '生徒情報が更新されました。'});
                 onStudentUpdate();
-                onOpenChange(false); // Close sheet on success
+                onOpenChange(false);
             }
         } catch (error: any) {
-            console.error("Save failed:", error);
-            const message = error.code ? `${error.code}: ${error.message}` : (error.message || "保存に失敗しました。");
             toast({ 
                 title: '失敗', 
-                description: message, 
+                description: error.message || "保存に失敗しました。", 
                 variant: 'destructive',
-                duration: 9000
             });
         } finally {
             setIsSaving(false);
@@ -236,8 +234,6 @@ function StudentSheet({
     }
     
     if (!student) return null;
-
-    const currentPlan = courseMap[formData.course || '2perMonth'];
 
     return (
         <>
@@ -299,32 +295,6 @@ function StudentSheet({
                                    <Switch id="isActive" checked={formData.isActive} onCheckedChange={value => handleFieldChange('isActive', value)} />
                                    <Label htmlFor="isActive" className="text-sm">{formData.isActive ? '在籍中' : '休会中'}</Label>
                                 </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="grade">学年</Label>
-                                <Input id="grade" value={formData.grade || ''} onChange={e => handleFieldChange('grade', e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="age">年齢</Label>
-                                <Input id="age" type="number" value={formData.age || ''} onChange={e => handleFieldChange('age', e.target.valueAsNumber)} />
-                            </div>
-                             <div className="space-y-2 col-span-2">
-                                <Label htmlFor="gender">性別</Label>
-                                 <Select value={formData.gender} onValueChange={(value: Student['gender']) => handleFieldChange('gender', value)}>
-                                    <SelectTrigger id="gender">
-                                        <SelectValue placeholder="性別を選択" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="male">男性</SelectItem>
-                                        <SelectItem value="female">女性</SelectItem>
-                                        <SelectItem value="other">その他</SelectItem>
-                                        <SelectItem value="unknown">不明</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                             <div className="space-y-2 col-span-2">
-                                <Label htmlFor="notes">メモ</Label>
-                                <Textarea id="notes" value={formData.notes || ''} onChange={e => handleFieldChange('notes', e.target.value)} />
                             </div>
                         </div>
 
@@ -418,7 +388,6 @@ export default function StudentsPage() {
             fetchMonthlyCounts(studentsData, currentMonth);
             setLoading(false);
         }, (error) => {
-            console.error("Error fetching students: ", error);
             toast({ title: 'エラー', description: '生徒情報の取得に失敗しました。', variant: 'destructive'});
             setLoading(false);
         });
@@ -485,7 +454,10 @@ export default function StudentsPage() {
             {students.length > 0 ? students.map(student => (
               <TableRow key={student.uid} onClick={() => handleStudentSelect(student)} className="cursor-pointer">
                 <TableCell className="font-medium">{student.name}</TableCell>
-                <TableCell className="font-mono text-xs">{student.studentCode || '生成中...'}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  {/* 生徒コードを表示。未生成の場合はシステムIDを補助表示 */}
+                  {student.studentCode || `ID: ${student.uid.substring(0, 8)}...`}
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{courseMap[student.course]?.name || student.course}</Badge>
                 </TableCell>
