@@ -200,6 +200,9 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
     };
 };
 
+/**
+ * Resolves the N+1 problem by fetching all lessons for a month in one batch.
+ */
 export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
     const q = query(
@@ -215,11 +218,6 @@ export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string
         }
     });
     return counts;
-};
-
-export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
-    const counts = await getMonthlyLessonCounts(month);
-    return counts[studentId] || 0;
 };
 
 export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {

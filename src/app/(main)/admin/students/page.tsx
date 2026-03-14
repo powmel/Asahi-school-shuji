@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Table,
