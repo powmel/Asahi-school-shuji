@@ -159,18 +159,18 @@ function StudentSheet({
     open, 
     onOpenChange,
     onStudentUpdate,
+    onDeleteRequest,
     currentMonth
 }: { 
     student: Partial<Student> | null, 
     open: boolean, 
     onOpenChange: (open: boolean) => void,
     onStudentUpdate: () => void,
+    onDeleteRequest: (student: Student) => void,
     currentMonth: Date
 }) {
     const [formData, setFormData] = useState<Partial<Student>>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isPrefDialogOpen, setIsPrefDialogOpen] = useState(false);
     const { toast } = useToast();
 
@@ -212,23 +212,6 @@ function StudentSheet({
         }
     };
     
-    const handleDelete = async () => {
-        if (!student || !student.uid) return;
-        setIsDeleting(true);
-        try {
-            await deleteStudent(student.uid);
-            toast({ title: '成功', description: '生徒が削除されました。'});
-            onStudentUpdate();
-            // 先にダイアログを閉じてから、シートを閉じる（オーバーレイの競合を避ける）
-            setIsDeleteDialogOpen(false);
-            setTimeout(() => onOpenChange(false), 100);
-        } catch (error: any) {
-            toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
-        } finally {
-            setIsDeleting(false);
-        }
-    }
-    
     if (!student) return null;
 
     return (
@@ -266,15 +249,15 @@ function StudentSheet({
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2 col-span-2">
                                 <Label htmlFor="name">名前</Label>
-                                <Input id="name" value={formData.name || ''} onChange={e => handleFieldChange('name', e.target.value)} disabled={isSaving || isDeleting} />
+                                <Input id="name" value={formData.name || ''} onChange={e => handleFieldChange('name', e.target.value)} disabled={isSaving} />
                             </div>
                              <div className="space-y-2 col-span-2">
                                 <Label htmlFor="email">メールアドレス</Label>
-                                <Input id="email" type="email" value={formData.email || ''} onChange={e => handleFieldChange('email', e.target.value)} disabled={isSaving || isDeleting} />
+                                <Input id="email" type="email" value={formData.email || ''} onChange={e => handleFieldChange('email', e.target.value)} disabled={isSaving} />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="course">コース</Label>
-                                <Select value={formData.course} onValueChange={(value: Student['course']) => handleFieldChange('course', value)} disabled={isSaving || isDeleting}>
+                                <Select value={formData.course} onValueChange={(value: Student['course']) => handleFieldChange('course', value)} disabled={isSaving}>
                                     <SelectTrigger id="course">
                                         <SelectValue placeholder="コースを選択" />
                                     </SelectTrigger>
@@ -288,7 +271,7 @@ function StudentSheet({
                              <div className="space-y-2">
                                 <Label htmlFor="isActive">ステータス</Label>
                                 <div className="flex items-center space-x-2 h-10">
-                                   <Switch id="isActive" checked={formData.isActive} onCheckedChange={value => handleFieldChange('isActive', value)} disabled={isSaving || isDeleting} />
+                                   <Switch id="isActive" checked={formData.isActive} onCheckedChange={value => handleFieldChange('isActive', value)} disabled={isSaving} />
                                    <Label htmlFor="isActive" className="text-sm">{formData.isActive ? '在籍中' : '休会中'}</Label>
                                 </div>
                             </div>
@@ -298,44 +281,24 @@ function StudentSheet({
                     <SheetFooter className="grid grid-cols-2 gap-2 sm:flex">
                         {!isNew && (
                             <>
-                            <Button variant="outline" onClick={() => setIsPrefDialogOpen(true)} disabled={isSaving || isDeleting}>
+                            <Button variant="outline" onClick={() => setIsPrefDialogOpen(true)} disabled={isSaving}>
                                 <Clock className="mr-2 h-4 w-4"/>
                                 時間指定
                             </Button>
-                            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving || isDeleting}>削除</Button>
+                            <Button variant="destructive" onClick={() => onDeleteRequest(student as Student)} disabled={isSaving}>削除</Button>
                             </>
                         )}
                         <div className="hidden sm:flex-grow" />
                         <SheetClose asChild>
-                            <Button variant="outline" disabled={isSaving || isDeleting}>キャンセル</Button>
+                            <Button variant="outline" disabled={isSaving}>キャンセル</Button>
                         </SheetClose>
-                        <Button onClick={handleSave} disabled={isSaving || isDeleting}>
+                        <Button onClick={handleSave} disabled={isSaving}>
                             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {isSaving ? '保存中...' : '保存'}
                         </Button>
                     </SheetFooter>
                 </SheetContent>
             </Sheet>
-
-            {!isNew && (
-                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                            <AlertDialogDescription asChild>
-                                <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
-                            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
-                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                削除
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            )}
 
             { !isNew && isPrefDialogOpen && student.uid &&
                 <PreferredSlotDialog 
@@ -349,7 +312,7 @@ function StudentSheet({
     )
 }
 
-function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Student, currentMonth: Date, onEdit: (s: Student) => void, onDelete: (id: string) => void }) {
+function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Student, currentMonth: Date, onEdit: (s: Student) => void, onDelete: (s: Student) => void }) {
     const [count, setCount] = useState<number | null>(null);
 
     useEffect(() => {
@@ -388,7 +351,7 @@ function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Stud
                             <FilePenLine className="mr-2 h-4 w-4" />
                             編集
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onDelete(student.uid); }} className="text-destructive">
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onDelete(student); }} className="text-destructive">
                             <Trash2 className="mr-2 h-4 w-4" />
                             削除
                         </DropdownMenuItem>
@@ -405,7 +368,8 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Partial<Student> | null>(null);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
     useEffect(() => {
@@ -448,20 +412,22 @@ export default function StudentsPage() {
       setCurrentMonth(current => direction === 'prev' ? subMonths(current, 1) : addMonths(current, 1));
   }
 
-  const handleDelete = async (studentId: string) => {
-      if (!studentId) return;
+  const handleDelete = async () => {
+      if (!studentToDelete) return;
+      setIsDeleting(true);
       try {
-          await deleteStudent(studentId);
+          await deleteStudent(studentToDelete.uid);
           toast({ title: '成功', description: '生徒が削除されました。'});
           setStudentToDelete(null);
+          setIsSheetOpen(false);
       } catch (error: any) {
           toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
+      } finally {
+          setIsDeleting(false);
       }
   }
 
   if (loading) return <Loading />;
-
-  const targetStudent = studentToDelete ? students.find(s => s.uid === studentToDelete) : null;
 
   return (
     <div>
@@ -492,7 +458,7 @@ export default function StudentsPage() {
                 student={student} 
                 currentMonth={currentMonth} 
                 onEdit={handleStudentSelect}
-                onDelete={(id) => setStudentToDelete(id)}
+                onDelete={setStudentToDelete}
               />
             )) : (
                 <TableRow>
@@ -511,6 +477,7 @@ export default function StudentsPage() {
             setIsSheetOpen(isOpen);
         }}
         onStudentUpdate={() => {}}
+        onDeleteRequest={setStudentToDelete}
         currentMonth={currentMonth}
       />
 
@@ -519,12 +486,19 @@ export default function StudentsPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
                 <AlertDialogDescription asChild>
-                    <div>「{targetStudent?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
+                    <div>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                <AlertDialogAction onClick={() => studentToDelete && handleDelete(studentToDelete)} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
+                <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+                <AlertDialogAction 
+                    onClick={(e) => { e.preventDefault(); handleDelete(); }} 
+                    className="bg-destructive hover:bg-destructive/90"
+                    disabled={isDeleting}
+                >
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    削除
+                </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
