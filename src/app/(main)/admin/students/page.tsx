@@ -417,13 +417,23 @@ export default function StudentsPage() {
       setIsDeleting(true);
       try {
           await deleteStudent(studentToDelete.uid);
-          toast({ title: '成功', description: '生徒が削除されました。'});
+          
+          // 1. 確認ダイアログをまず閉じる
           setStudentToDelete(null);
-          setIsSheetOpen(false);
+          
+          // 2. わずかに時間を置いてからシートを閉じることで、
+          // Radix UIのオーバーレイ競合によるフリーズを回避
+          setTimeout(() => {
+              setIsSheetOpen(false);
+              setSelectedStudent(null);
+              toast({ title: '成功', description: '生徒が削除されました。'});
+          }, 150);
+
       } catch (error: any) {
           toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
-      } finally {
           setIsDeleting(false);
+      } finally {
+          // 成功時はsetTimeout内で状態がクリアされる
       }
   }
 
@@ -481,7 +491,13 @@ export default function StudentsPage() {
         currentMonth={currentMonth}
       />
 
-      <AlertDialog open={!!studentToDelete} onOpenChange={(open) => !open && setStudentToDelete(null)}>
+      <AlertDialog 
+        open={!!studentToDelete} 
+        onOpenChange={(open) => {
+            // 削除処理中でない場合のみ、手動での閉鎖を許可
+            if (!open && !isDeleting) setStudentToDelete(null);
+        }}
+      >
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
