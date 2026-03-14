@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -507,7 +508,7 @@ export default function StudentsPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
                 <AlertDialogDescription asChild>
-                    <div>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
+                    <p>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</p>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

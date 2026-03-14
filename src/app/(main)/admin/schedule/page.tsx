@@ -18,7 +18,7 @@ import {
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, countStudentLessonsInMonth, getAppSettings, AppSettings, getDefaultActiveDatesForMonth } from '@/lib/data';
+import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, getMonthlyLessonCounts, getAppSettings, AppSettings, getDefaultActiveDatesForMonth } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import {
@@ -71,17 +71,7 @@ export function EditSlotDialog({
 
   useEffect(() => {
     if (open && allStudents.length > 0 && slot) {
-      const fetchCounts = async () => {
-        const counts: Record<string, number> = {};
-        const promises = allStudents.map(student =>
-            countStudentLessonsInMonth(student.uid, currentMonth).then(count => {
-                counts[student.uid] = count;
-            })
-        );
-        await Promise.all(promises);
-        setStudentMonthlyCounts(counts);
-      };
-      fetchCounts();
+      getMonthlyLessonCounts(currentMonth).then(setStudentMonthlyCounts);
     }
   }, [open, allStudents, currentMonth, slot]);
 
