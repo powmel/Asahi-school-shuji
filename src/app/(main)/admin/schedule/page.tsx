@@ -133,7 +133,7 @@ export function EditSlotDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-background">
           <DialogHeader>
             <DialogTitle>生徒の割り当て</DialogTitle>
             <DialogDescription>
@@ -195,8 +195,8 @@ export function EditSlotDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div>
-                <div>以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？</div>
+              <div className="space-y-2">
+                <p>以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？</p>
                 <ul className="mt-2 list-disc list-inside">
                   {studentsToConfirm.map(s => <li key={s.uid}>{s.name}</li>)}
                 </ul>

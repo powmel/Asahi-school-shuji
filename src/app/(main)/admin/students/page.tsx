@@ -233,7 +233,7 @@ function StudentSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
-                <SheetContent className="sm:max-w-lg overflow-y-auto">
+                <SheetContent className="sm:max-w-lg overflow-y-auto bg-background">
                     <SheetHeader>
                         <SheetTitle>{isNew ? "新規生徒追加" : student.name}</SheetTitle>
                         <SheetDescription>{isNew ? "新しい生徒の詳細情報を入力してください。" : "生徒の詳細情報を確認・編集します。"}</SheetDescription>

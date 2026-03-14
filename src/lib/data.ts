@@ -315,6 +315,41 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     });
 };
 
+export const moveStudentBetweenSlots = async (studentId: string, fromSlotId: string, toSlotId: string): Promise<void> => {
+    const db = getDb();
+    
+    await runTransaction(db, async (transaction) => {
+        // Find the lesson to move
+        const q = query(
+            collection(db, 'lessons'), 
+            where('studentId', '==', studentId), 
+            where('slotId', '==', fromSlotId),
+            where('status', 'in', ['approved', 'scheduled'])
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const lessonDoc = snapshot.docs[0];
+            // Delete old
+            transaction.delete(lessonDoc.ref);
+            
+            // Create new
+            const newLessonRef = doc(collection(db, 'lessons'));
+            transaction.set(newLessonRef, {
+                studentId,
+                slotId: toSlotId,
+                status: 'approved',
+                priority: 'normal',
+                updatedAt: serverTimestamp(),
+                createdBy: 'teacher',
+                source: 'manual',
+            });
+        } else {
+            throw new Error("元の予約が見つかりませんでした。");
+        }
+    });
+};
+
 // --- Announcement API ---
 export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
     const q = query(collection(getDb(), 'announcements'), where('published', '==', true));
