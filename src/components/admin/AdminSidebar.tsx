@@ -8,15 +8,13 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Calendar, LayoutDashboard, Users, Repeat, Megaphone, Brush, CalendarClock, CalendarDays } from "lucide-react";
 import Link from 'next/link';
-import { UserNav } from '@/components/UserNav';
 import { format } from 'date-fns';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 const todayPathForLink = `/admin/day/${format(new Date(), 'yyyy-MM-dd')}`;
 
@@ -41,7 +39,6 @@ export function AdminSidebar() {
     if (item.exact) {
       return pathname === item.href;
     }
-    // Handle /admin being a prefix for all other admin routes
     if (item.href === '/admin') {
         return pathname === '/admin';
     }
@@ -49,26 +46,39 @@ export function AdminSidebar() {
   };
   
   const activeItemLabel = useMemo(() => {
-    // Find the most specific match first
     const specificItem = [...menuItems].reverse().find(isActive);
     return specificItem ? specificItem.label : 'ダッシュボード';
   }, [pathname]);
 
   return (
     <>
-      <SidebarHeader className="border-b border-border/50 p-2 flex items-center gap-2">
-        <div className="flex items-center gap-2 flex-grow cursor-pointer" onClick={() => {
+      <SidebarHeader className="border-b border-border/50 p-2">
+        <button 
+          onClick={() => {
             const trigger = document.querySelector('[data-sidebar="trigger"]') as HTMLElement;
             trigger?.click();
-        }}>
-            <Brush className="h-6 w-6 shrink-0 text-primary" />
-            <div className="flex-grow overflow-hidden">
-                <h2 className="font-headline text-lg font-semibold truncate">管理者パネル</h2>
-                <p className="text-xs text-muted-foreground truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
-                    {activeItemLabel}
-                </p>
-            </div>
-        </div>
+          }}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all",
+            "bg-primary/5 hover:bg-primary/10 active:scale-[0.98]",
+            "border border-primary/10 shadow-sm"
+          )}
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
+            <Brush className="h-5 w-5" />
+          </div>
+          <div className={cn(
+            "flex flex-col overflow-hidden transition-all duration-300",
+            state === "collapsed" ? "w-0 opacity-0" : "w-full opacity-100"
+          )}>
+            <span className="font-headline text-sm font-bold leading-none text-foreground">
+              管理者パネル
+            </span>
+            <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              {activeItemLabel}
+            </span>
+          </div>
+        </button>
       </SidebarHeader>
       <SidebarContent className="p-2">
         <SidebarMenu>
@@ -88,7 +98,6 @@ export function AdminSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      {/* Footer can be added here if needed */}
     </>
   );
 }
