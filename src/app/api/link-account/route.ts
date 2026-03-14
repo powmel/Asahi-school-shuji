@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
+  if (!adminDb || !adminAuth) {
+    return NextResponse.json({ error: 'Firebase Admin SDK not initialized' }, { status: 500 });
+  }
+
   const { studentCode, linkToken } = await request.json();
   const authorization = request.headers.get('Authorization');
 
