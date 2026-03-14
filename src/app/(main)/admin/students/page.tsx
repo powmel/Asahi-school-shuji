@@ -40,7 +40,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent, getDb } from '@/lib/data';
@@ -219,8 +219,9 @@ function StudentSheet({
             await deleteStudent(student.uid);
             toast({ title: '成功', description: '生徒が削除されました。'});
             onStudentUpdate();
+            // 先にダイアログを閉じてから、シートを閉じる（オーバーレイの競合を避ける）
             setIsDeleteDialogOpen(false);
-            onOpenChange(false);
+            setTimeout(() => onOpenChange(false), 100);
         } catch (error: any) {
             toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
         } finally {
@@ -301,26 +302,7 @@ function StudentSheet({
                                 <Clock className="mr-2 h-4 w-4"/>
                                 時間指定
                             </Button>
-                            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                               <AlertDialogTrigger asChild>
-                                 <Button variant="destructive" disabled={isSaving || isDeleting}>削除</Button>
-                               </AlertDialogTrigger>
-                               <AlertDialogContent>
-                                   <AlertDialogHeader>
-                                       <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                                       <AlertDialogDescription asChild>
-                                          <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
-                                       </AlertDialogDescription>
-                                   </AlertDialogHeader>
-                                   <AlertDialogFooter>
-                                       <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
-                                       <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
-                                           {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                           削除
-                                       </AlertDialogAction>
-                                   </AlertDialogFooter>
-                               </AlertDialogContent>
-                            </AlertDialog>
+                            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving || isDeleting}>削除</Button>
                             </>
                         )}
                         <div className="hidden sm:flex-grow" />
@@ -334,6 +316,26 @@ function StudentSheet({
                     </SheetFooter>
                 </SheetContent>
             </Sheet>
+
+            {!isNew && (
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                            <AlertDialogDescription asChild>
+                                <div>「{student.name}」さんを削除します。この操作は元に戻せません。関連する全てのレッスン予約も削除されます。</div>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+                            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                削除
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
 
             { !isNew && isPrefDialogOpen && student.uid &&
                 <PreferredSlotDialog 
@@ -386,26 +388,10 @@ function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Stud
                             <FilePenLine className="mr-2 h-4 w-4" />
                             編集
                         </DropdownMenuItem>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    削除
-                                </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                                    <AlertDialogDescription asChild>
-                                        <div>「{student.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => onDelete(student.uid)} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onDelete(student.uid); }} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            削除
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </TableCell>
@@ -419,6 +405,7 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Partial<Student> | null>(null);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
     useEffect(() => {
@@ -466,14 +453,15 @@ export default function StudentsPage() {
       try {
           await deleteStudent(studentId);
           toast({ title: '成功', description: '生徒が削除されました。'});
-          setIsSheetOpen(false);
-          setSelectedStudent(null);
+          setStudentToDelete(null);
       } catch (error: any) {
           toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
       }
   }
 
   if (loading) return <Loading />;
+
+  const targetStudent = studentToDelete ? students.find(s => s.uid === studentToDelete) : null;
 
   return (
     <div>
@@ -504,7 +492,7 @@ export default function StudentsPage() {
                 student={student} 
                 currentMonth={currentMonth} 
                 onEdit={handleStudentSelect}
-                onDelete={handleDelete}
+                onDelete={(id) => setStudentToDelete(id)}
               />
             )) : (
                 <TableRow>
@@ -525,6 +513,21 @@ export default function StudentsPage() {
         onStudentUpdate={() => {}}
         currentMonth={currentMonth}
       />
+
+      <AlertDialog open={!!studentToDelete} onOpenChange={(open) => !open && setStudentToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                    <div>「{targetStudent?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={() => studentToDelete && handleDelete(studentToDelete)} className="bg-destructive hover:bg-destructive/90">削除</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

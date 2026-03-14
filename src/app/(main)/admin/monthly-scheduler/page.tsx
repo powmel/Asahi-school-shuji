@@ -314,20 +314,22 @@ export default function MonthlySchedulerPage() {
       const student = studentsWithUsage.find(s => s.uid === studentId);
       if (!student) return;
 
-      // 既にその日に予約があるかチェック (同じ日の中での移動ならOK)
       const dateSlots = allSlots.filter(s => s.date === date);
-      const isAlreadyOnDate = dateSlots.some(s => s.assignedStudentIds.includes(studentId));
+      const existingSlotOnDate = dateSlots.find(s => s.assignedStudentIds.includes(studentId));
 
-      if (isAlreadyOnDate) {
+      // 同じ日の別の枠に移動する場合（ sourceSlotId が同じ日にあるかチェック）
+      const isInternalMove = sourceSlotId && allSlots.find(s => s.slotId === sourceSlotId)?.date === date;
+
+      if (existingSlotOnDate && !isInternalMove) {
         toast({ title: "重複", description: "この生徒は既にこの日に予約があります。", variant: "default" });
         setSelectedStudentId(null);
         setSourceSlotId(null);
         return;
       }
 
+      // 「移動」の場合は上限チェックをスキップ（予約数は増えないため）
       const isMove = sourceSlotId !== null;
 
-      // 新規追加の場合のみ上限チェック
       if (!isMove) {
           const { limit } = courseMap[student.course];
           if (student.usage >= limit) {
@@ -355,7 +357,6 @@ export default function MonthlySchedulerPage() {
     const student = studentsWithUsage.find(s => s.uid === studentId);
     if (!student) return;
 
-    const isMove = sourceSlotId !== null;
     const targetSlot = allSlots.find(s => s.slotId === slotId);
     if (!targetSlot) return;
 
@@ -364,7 +365,11 @@ export default function MonthlySchedulerPage() {
         return;
     }
 
-    // 新規追加の場合のみ上限チェック
+    // すでに同じ日の別スロットにいる場合は移動扱いにする
+    const currentSlotOnSameDay = allSlots.find(s => s.date === targetSlot.date && s.assignedStudentIds.includes(studentId));
+    const effectiveSourceSlotId = sourceSlotId || currentSlotOnSameDay?.slotId || null;
+    const isMove = effectiveSourceSlotId !== null;
+
     if (!isMove) {
         const { limit } = courseMap[student.course];
         if (student.usage >= limit) {
@@ -379,7 +384,7 @@ export default function MonthlySchedulerPage() {
 
     try {
         if (isMove) {
-            await moveStudentBetweenSlots(studentId, sourceSlotId!, slotId);
+            await moveStudentBetweenSlots(studentId, effectiveSourceSlotId!, slotId);
             toast({ title: "成功", description: `レッスンを移動しました。` });
         } else {
             const newStudentIds = Array.from(new Set([...targetSlot.assignedStudentIds, studentId]));
@@ -491,7 +496,7 @@ export default function MonthlySchedulerPage() {
       </div>
       
       <Dialog open={isSlotPanelOpen} onOpenChange={setIsSlotPanelOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-background">
             <DialogHeader>
                 <DialogTitle>時間スロット割り当て</DialogTitle>
                 <DialogDescription>

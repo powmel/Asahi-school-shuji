@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -75,8 +76,12 @@
 @layer base {
   * {
     @apply border-border;
+    cursor: default;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  button, a, [role="button"] {
+    cursor: pointer !important;
   }
 }
