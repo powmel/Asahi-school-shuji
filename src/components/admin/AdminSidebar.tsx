@@ -30,7 +30,7 @@ export const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   
   const isActive = (item: typeof menuItems[0]) => {
     if (item.base) {
@@ -54,27 +54,24 @@ export function AdminSidebar() {
     <>
       <SidebarHeader className="border-b border-border/50 p-2">
         <button 
-          onClick={() => {
-            const trigger = document.querySelector('[data-sidebar="trigger"]') as HTMLElement;
-            trigger?.click();
-          }}
+          onClick={toggleSidebar}
           className={cn(
             "flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all",
-            "bg-primary/5 hover:bg-primary/10 active:scale-[0.98]",
-            "border border-primary/10 shadow-sm"
+            "bg-primary text-primary-foreground shadow-lg hover:brightness-110 active:scale-[0.98]",
+            "border border-primary/20"
           )}
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/20 text-white shadow-sm">
             <Brush className="h-5 w-5" />
           </div>
           <div className={cn(
             "flex flex-col overflow-hidden transition-all duration-300",
             state === "collapsed" ? "w-0 opacity-0" : "w-full opacity-100"
           )}>
-            <span className="font-headline text-sm font-bold leading-none text-foreground">
+            <span className="font-headline text-sm font-bold leading-none">
               管理者パネル
             </span>
-            <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+            <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider opacity-80">
               {activeItemLabel}
             </span>
           </div>
@@ -88,10 +85,15 @@ export function AdminSidebar() {
                 asChild
                 isActive={isActive(item)}
                 tooltip={{ children: item.label }}
+                className={cn(
+                  "transition-all duration-200 h-10",
+                  "hover:bg-primary hover:text-primary-foreground",
+                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md"
+                )}
               >
                 <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
+                  <item.icon className="shrink-0" />
+                  <span className="font-medium">{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
