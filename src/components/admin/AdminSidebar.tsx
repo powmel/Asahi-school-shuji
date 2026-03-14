@@ -1,4 +1,3 @@
-
 "use client";
 
 import { usePathname } from 'next/navigation';
@@ -56,29 +55,29 @@ export function AdminSidebar() {
         <button 
           onClick={toggleSidebar}
           className={cn(
-            "flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all",
+            "flex w-full items-center gap-3 rounded-lg p-3 text-left transition-all",
             "bg-primary text-primary-foreground shadow-lg hover:brightness-110 active:scale-[0.98]",
             "border border-primary/20"
           )}
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/20 text-white shadow-sm">
-            <Brush className="h-5 w-5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/20 text-white shadow-sm">
+            <Brush className="h-6 w-6" />
           </div>
           <div className={cn(
             "flex flex-col overflow-hidden transition-all duration-300",
             state === "collapsed" ? "w-0 opacity-0" : "w-full opacity-100"
           )}>
-            <span className="font-headline text-sm font-bold leading-none">
+            <span className="font-headline text-base font-bold leading-none text-white">
               管理者パネル
             </span>
-            <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider opacity-80">
+            <span className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider text-white/80">
               {activeItemLabel}
             </span>
           </div>
         </button>
       </SidebarHeader>
-      <SidebarContent className="p-2">
-        <SidebarMenu>
+      <SidebarContent className="p-3">
+        <SidebarMenu className="gap-2">
           {menuItems.map(item => (
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
@@ -86,14 +85,16 @@ export function AdminSidebar() {
                 isActive={isActive(item)}
                 tooltip={{ children: item.label }}
                 className={cn(
-                  "transition-all duration-200 h-10",
-                  "hover:bg-primary hover:text-primary-foreground",
-                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md"
+                  "transition-all duration-200 h-11 px-4 rounded-md border border-transparent font-medium",
+                  "bg-muted/50 text-foreground", // 通常時のボタン風背景
+                  "hover:bg-primary hover:text-primary-foreground hover:shadow-md", // ホバー時
+                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-lg data-[active=true]:border-primary/20", // アクティブ時
+                  "flex items-center"
                 )}
               >
                 <Link href={item.href}>
-                  <item.icon className="shrink-0" />
-                  <span className="font-medium">{item.label}</span>
+                  <item.icon className="shrink-0 mr-2" />
+                  <span>{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
