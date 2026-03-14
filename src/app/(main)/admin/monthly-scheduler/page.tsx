@@ -317,7 +317,7 @@ export default function MonthlySchedulerPage() {
       const dateSlots = allSlots.filter(s => s.date === date);
       const existingSlotOnDate = dateSlots.find(s => s.assignedStudentIds.includes(studentId));
 
-      // 同じ日の別の枠に移動する場合（ sourceSlotId が同じ日にあるかチェック）
+      // 同じ日の別の枠に移動する場合
       const isInternalMove = sourceSlotId && allSlots.find(s => s.slotId === sourceSlotId)?.date === date;
 
       if (existingSlotOnDate && !isInternalMove) {
@@ -327,7 +327,7 @@ export default function MonthlySchedulerPage() {
         return;
       }
 
-      // 「移動」の場合は上限チェックをスキップ（予約数は増えないため）
+      // 「移動」の場合は上限チェックをスキップ
       const isMove = sourceSlotId !== null;
 
       if (!isMove) {
@@ -365,9 +365,8 @@ export default function MonthlySchedulerPage() {
         return;
     }
 
-    // すでに同じ日の別スロットにいる場合は移動扱いにする
-    const currentSlotOnSameDay = allSlots.find(s => s.date === targetSlot.date && s.assignedStudentIds.includes(studentId));
-    const effectiveSourceSlotId = sourceSlotId || currentSlotOnSameDay?.slotId || null;
+    // すでに別のスロットにいる場合は移動扱いにする
+    const effectiveSourceSlotId = sourceSlotId || allSlots.find(s => s.assignedStudentIds.includes(studentId))?.slotId || null;
     const isMove = effectiveSourceSlotId !== null;
 
     if (!isMove) {
@@ -450,7 +449,6 @@ export default function MonthlySchedulerPage() {
       </PageHeader>
 
       <div className="flex-1 grid md:grid-cols-3 gap-4 overflow-hidden">
-        {/* Zone A: Student Pool */}
         <div className="flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
             <ScrollArea className="flex-1 pr-2">
@@ -467,7 +465,6 @@ export default function MonthlySchedulerPage() {
             </ScrollArea>
         </div>
 
-        {/* Zone B: Date Buckets */}
         <div className="md:col-span-2 flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
             <ScrollArea className='flex-1' hideScrollbar>
