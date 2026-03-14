@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Table,
@@ -424,7 +424,7 @@ export default function StudentsPage() {
     useEffect(() => {
         setLoading(true);
         const db = getDb();
-        const q = query(collection(db, 'students'));
+        const q = collection(db, 'students');
         
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const studentsData: Student[] = [];

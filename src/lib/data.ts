@@ -16,16 +16,14 @@ import {
     serverTimestamp,
     runTransaction,
     writeBatch,
-    collectionGroup,
 } from 'firebase/firestore';
 import type { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
-import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
 import { initializeFirebase } from '@/firebase';
 
 
 // This function ensures that Firestore is initialized before we try to use it.
 export const getDb = () => {
-    // This function will be called within other functions, ensuring app is initialized.
     const { firestore } = initializeFirebase();
     return firestore;
 };
@@ -95,7 +93,6 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
                 transaction.update(counterRef, { current: newCount });
             }
 
-            // より直感的な接頭辞 '@std' に変更
             const studentCode = `@std${String(newCount).padStart(4, '0')}`;
             const linkToken = Math.floor(100000 + Math.random() * 900000).toString();
             const linkTokenExpiresAt = new Date();
@@ -287,7 +284,6 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     
     await runTransaction(db, async (transaction) => {
         const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId), where('status', 'in', ['approved', 'scheduled']));
-        
         const currentLessonsSnap = await getDocs(lessonsQuery);
         
         const currentStudentIds = new Set(currentLessonsSnap.docs.map(doc => doc.data().studentId));

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { usePathname } from 'next/navigation';
@@ -86,9 +87,9 @@ export function AdminSidebar() {
                 tooltip={{ children: item.label }}
                 className={cn(
                   "transition-all duration-200 h-11 px-4 rounded-md border border-transparent font-medium",
-                  "bg-muted/50 text-foreground", // 通常時のボタン風背景
-                  "hover:bg-primary hover:text-primary-foreground hover:shadow-md", // ホバー時
-                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-lg data-[active=true]:border-primary/20", // アクティブ時
+                  "bg-muted/50 text-foreground",
+                  "hover:bg-primary hover:text-primary-foreground hover:shadow-md",
+                  "data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-lg data-[active=true]:border-primary/20",
                   "flex items-center"
                 )}
               >

@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, UserPlus, Sparkles, AlertCircle, Settings, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, Sparkles, Settings, Star } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -28,8 +29,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';

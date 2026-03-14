@@ -137,46 +137,28 @@ function SlotAssignmentPanel({
   onSelectStudent: (studentId: string) => void;
   selectedStudentId: string | null;
 }) {
-  const { toast } = useToast();
-  const studentsWithUsage = useMemo((): StudentWithUsage[] => {
-    return allStudents
-      .map(s => ({ ...s, usage: 0 /* This usage is not real-time, just for type compliance */ }))
-  }, [allStudents]);
-
-
-  const handleSlotClick = (slot: TimeSlot) => {
-    if (selectedStudentId) {
-       const student = studentsWithUsage.find(s => s.uid === selectedStudentId);
-       if (!student) return;
-
-       if (slot.assignedStudentIds.includes(selectedStudentId)) {
-        // If student is already in this slot, unassign
-        onUnassign(selectedStudentId, slot.slotId);
-      } else {
-        // If student is not in this slot, try to assign
-        onAssign(selectedStudentId, slot.slotId);
-      }
-    }
-  }
-
   return (
     <div className="space-y-2 max-h-[60vh] overflow-y-auto p-1">
       {slots.map(slot => {
         const isFull = slot.assignedStudentIds.length >= slot.capacity;
+        const isSelectedStudentInThisSlot = selectedStudentId && slot.assignedStudentIds.includes(selectedStudentId);
+
         return (
           <div
             key={slot.slotId}
             className={cn(
               "p-3 border rounded-lg",
-              selectedStudentId && !isFull && "cursor-pointer hover:bg-muted/50",
-               selectedStudentId && slot.assignedStudentIds.includes(selectedStudentId) && "cursor-pointer hover:bg-muted/50", // Allow un-assigning
-              isFull && !slot.assignedStudentIds.includes(selectedStudentId || '') && "cursor-not-allowed bg-muted/40"
+              selectedStudentId && !isFull && !isSelectedStudentInThisSlot && "cursor-pointer hover:bg-muted/50",
+              isSelectedStudentInThisSlot && "cursor-pointer bg-primary/5 border-primary",
+              isFull && !isSelectedStudentInThisSlot && "cursor-not-allowed bg-muted/40"
             )}
             onClick={() => {
-                if (selectedStudentId && !isFull && !slot.assignedStudentIds.includes(selectedStudentId)) {
-                     handleSlotClick(slot);
-                } else if (selectedStudentId && slot.assignedStudentIds.includes(selectedStudentId)) {
-                     handleSlotClick(slot);
+                if (selectedStudentId) {
+                    if (isSelectedStudentInThisSlot) {
+                        onUnassign(selectedStudentId, slot.slotId);
+                    } else if (!isFull) {
+                        onAssign(selectedStudentId, slot.slotId);
+                    }
                 }
             }}
           >
@@ -235,7 +217,7 @@ export default function MonthlySchedulerPage() {
     return allStudents
       .filter(s => s.isActive)
       .map(s => ({ ...s, usage: studentUsage[s.uid] || 0 }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   }, [allStudents, studentUsage]);
 
   const activeDates = useMemo(() => {
@@ -291,7 +273,6 @@ export default function MonthlySchedulerPage() {
     }
   };
   
-  // New logic to just ADD a student to a date
   const addStudentToDate = async (studentId: string, date: string) => {
       const student = studentsWithUsage.find(s => s.uid === studentId);
       if (!student) return;
@@ -299,6 +280,17 @@ export default function MonthlySchedulerPage() {
       const { limit } = courseMap[student.course];
       const currentUsage = student.usage;
 
+      // 既にその日に予約があるかチェック
+      const dateSlots = allSlots.filter(s => s.date === date);
+      const isAlreadyOnDate = dateSlots.some(s => s.assignedStudentIds.includes(studentId));
+
+      if (isAlreadyOnDate) {
+        toast({ title: "重複", description: "この生徒は既にこの日に予約があります。", variant: "default" });
+        setSelectedStudentId(null);
+        return;
+      }
+
+      // 上限チェック (移動ではなく新規追加の場合)
       if (currentUsage >= limit) {
           toast({
               title: "上限超過",
@@ -308,12 +300,6 @@ export default function MonthlySchedulerPage() {
           return;
       }
       
-      const dateSlots = allSlots.filter(s => s.date === date);
-      if (dateSlots.some(s => s.assignedStudentIds.includes(studentId))) {
-        toast({ title: "重複", description: "この生徒は既にこの日に予約があります。", variant: "default" });
-        return;
-      }
-      
       const availableSlot = dateSlots.sort((a,b) => a.startTime.localeCompare(b.startTime)).find(s => s.assignedStudentIds.length < s.capacity);
 
       if (availableSlot) {
@@ -321,42 +307,33 @@ export default function MonthlySchedulerPage() {
       } else {
         toast({ title: "満席", description: "この日の空きスロットがありません。", variant: "destructive" });
       }
-      setSelectedStudentId(null); // Deselect student after action
+      setSelectedStudentId(null);
   }
   
-  // Unified assignment handler
   const handleAssignment = async (studentId: string, slotId: string, assign: boolean) => {
     try {
-        const targetSlot = allSlots.find(s => s.slotId === slotId) || {
-            slotId: slotId,
-            date: slotId.substring(0, 10),
-            startTime: slotId.substring(11),
-            capacity: appSettings?.defaultSlotCapacity || 4,
-            assignedStudentIds: []
-        };
+        const targetSlot = allSlots.find(s => s.slotId === slotId);
+        if (!targetSlot && assign) throw new Error("Slot not found");
         
         let newTargetStudentIds: string[];
         if (assign) {
-            // Prevent adding if slot is full
-            if (targetSlot.assignedStudentIds.length >= targetSlot.capacity && !targetSlot.assignedStudentIds.includes(studentId)) {
+            if (targetSlot!.assignedStudentIds.length >= targetSlot!.capacity) {
                 toast({ title: "満席", description: "このスロットは満席です。", variant: "destructive" });
                 return;
             }
-            newTargetStudentIds = Array.from(new Set([...targetSlot.assignedStudentIds, studentId]));
+            newTargetStudentIds = Array.from(new Set([...targetSlot!.assignedStudentIds, studentId]));
         } else {
-            newTargetStudentIds = targetSlot.assignedStudentIds.filter(id => id !== studentId);
+            newTargetStudentIds = (targetSlot?.assignedStudentIds || []).filter(id => id !== studentId);
         }
 
         await updateSlotAssignments(slotId, newTargetStudentIds);
         
         toast({ title: "成功", description: `割り当てを更新しました。` });
-        await fetchData(currentMonth); // Re-fetch all data to ensure consistency
+        await fetchData(currentMonth);
 
     } catch (error) {
         const message = error instanceof Error ? error.message : "割り当ての更新に失敗しました。";
         toast({ title: "エラー", description: message, variant: "destructive" });
-    } finally {
-        setSelectedStudentId(null);
     }
   };
 
@@ -364,20 +341,21 @@ export default function MonthlySchedulerPage() {
     const slot = allSlots.find(s => s.date === date && s.assignedStudentIds.includes(studentId));
     if (slot) {
       await handleAssignment(studentId, slot.slotId, false);
-    } else {
-      toast({ title: "エラー", description: "削除対象の予約が見つかりません。", variant: "destructive" });
     }
   };
 
-  const handleAssignToSlot = (studentId: string, slotId: string) => {
+  const handleAssignToSlot = async (studentId: string, slotId: string) => {
     const student = studentsWithUsage.find(s => s.uid === studentId);
     if (!student) return;
 
     const { limit } = courseMap[student.course];
-    const currentUsage = student.usage;
-    const isAlreadyInSlot = allSlots.find(s => s.slotId === slotId)?.assignedStudentIds.includes(studentId);
+    const date = slotId.substring(0, 10);
+    
+    // 同じ日の別のスロットにいないかチェック
+    const otherSlotOnSameDay = allSlots.find(s => s.date === date && s.slotId !== slotId && s.assignedStudentIds.includes(studentId));
 
-    if (!isAlreadyInSlot && currentUsage >= limit) {
+    // 移動ではなく完全新規追加の場合のみ上限チェック
+    if (!otherSlotOnSameDay && student.usage >= limit) {
         toast({
             title: "上限超過",
             description: `「${student.name}」さんは今月の上限 ${limit} 回に達しています。`,
@@ -386,8 +364,14 @@ export default function MonthlySchedulerPage() {
         return;
     }
 
-    handleAssignment(studentId, slotId, true);
+    if (otherSlotOnSameDay) {
+        // 同じ日の移動処理：古いスロットから削除
+        await handleAssignment(studentId, otherSlotOnSameDay.slotId, false);
+    }
+
+    await handleAssignment(studentId, slotId, true);
     setIsSlotPanelOpen(false);
+    setSelectedStudentId(null);
   };
 
   useEffect(() => {
@@ -477,7 +461,7 @@ export default function MonthlySchedulerPage() {
                 selectedStudentId={selectedStudentId}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground bg-muted/20 rounded-lg">
+              <div className="flex items-center justify-center h-48 text-muted-foreground bg-muted/20 rounded-lg">
                 <p>エラー：日付が選択されていません</p>
               </div>
             )}
@@ -486,7 +470,3 @@ export default function MonthlySchedulerPage() {
     </div>
   );
 }
-    
-    
-
-    
