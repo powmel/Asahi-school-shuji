@@ -1,4 +1,3 @@
-
 'use client';
 import {
     getFirestore,
@@ -201,16 +200,27 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
     };
 };
 
-export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
+export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
     const q = query(
         collection(getDb(), 'lessons'), 
-        where('studentId', '==', studentId),
         where('status', 'in', ['approved', 'scheduled'])
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.filter(doc => doc.data().slotId.startsWith(monthStr)).length;
-}
+    const counts: Record<string, number> = {};
+    snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.slotId.startsWith(monthStr)) {
+            counts[data.studentId] = (counts[data.studentId] || 0) + 1;
+        }
+    });
+    return counts;
+};
+
+export const countStudentLessonsInMonth = async (studentId: string, month: Date): Promise<number> => {
+    const counts = await getMonthlyLessonCounts(month);
+    return counts[studentId] || 0;
+};
 
 export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     const monthStr = format(month, 'yyyy-MM');

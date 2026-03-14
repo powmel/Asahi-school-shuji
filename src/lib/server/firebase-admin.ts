@@ -1,9 +1,8 @@
-
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (key && key !== 'undefined') {
+  if (key && typeof key === 'string' && key.trim() !== '' && key !== 'undefined') {
     try {
       const serviceAccount = JSON.parse(key);
       admin.initializeApp({
@@ -13,7 +12,7 @@ if (!admin.apps.length) {
       console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', e);
     }
   } else {
-    console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is missing or undefined. Firebase Admin SDK not initialized.');
+    console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is missing, empty or undefined. Firebase Admin SDK not initialized.');
   }
 }
 

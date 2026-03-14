@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -20,11 +19,11 @@ import { cn } from '@/lib/utils';
 import {
   getAllStudents,
   getSlotsForMonth,
-  countStudentLessonsInMonth,
   updateSlotAssignments,
   moveStudentBetweenSlots,
   getAppSettings,
-  getDefaultActiveDatesForMonth
+  getDefaultActiveDatesForMonth,
+  getMonthlyLessonCounts
 } from '@/lib/data';
 import type { Student, TimeSlot, AppSettings } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -250,19 +249,15 @@ export default function MonthlySchedulerPage() {
   const fetchData = useCallback(async (month: Date) => {
     setLoading(true);
     try {
-      const [studentsData, slotsData, settingsData] = await Promise.all([
+      const [studentsData, slotsData, settingsData, usage] = await Promise.all([
         getAllStudents(),
         getSlotsForMonth(month),
-        getAppSettings()
+        getAppSettings(),
+        getMonthlyLessonCounts(month)
       ]);
       setAllStudents(studentsData);
       setAllSlots(slotsData);
       setAppSettings(settingsData);
-
-      const usage: Record<string, number> = {};
-      await Promise.all(studentsData.map(async (student) => {
-        usage[student.uid] = await countStudentLessonsInMonth(student.uid, month);
-      }));
       setStudentUsage(usage);
     } catch (error) {
       toast({ title: "エラー", description: "データの取得に失敗しました。", variant: "destructive" });

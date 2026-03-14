@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Table,
@@ -43,12 +42,12 @@ import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { updateStudent, deleteStudent, countStudentLessonsInMonth, createStudent, getDb } from '@/lib/data';
+import { updateStudent, deleteStudent, createStudent, getDb, getMonthlyLessonCounts } from '@/lib/data';
 import type { Student } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { collection, onSnapshot, query, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, Timestamp } from 'firebase/firestore';
 
 
 const courseMap: { [key in Student['course']]: {name: string, limit: number} } = {
@@ -159,15 +158,13 @@ function StudentSheet({
     open, 
     onOpenChange,
     onStudentUpdate,
-    onDeleteRequest,
-    currentMonth
+    onDeleteRequest
 }: { 
     student: Partial<Student> | null, 
     open: boolean, 
     onOpenChange: (open: boolean) => void,
     onStudentUpdate: () => void,
-    onDeleteRequest: (student: Student) => void,
-    currentMonth: Date
+    onDeleteRequest: (student: Student) => void
 }) {
     const [formData, setFormData] = useState<Partial<Student>>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -312,13 +309,17 @@ function StudentSheet({
     )
 }
 
-function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Student, currentMonth: Date, onEdit: (s: Student) => void, onDelete: (s: Student) => void }) {
-    const [count, setCount] = useState<number | null>(null);
-
-    useEffect(() => {
-        countStudentLessonsInMonth(student.uid, currentMonth).then(setCount);
-    }, [student.uid, currentMonth]);
-
+function StudentRow({ 
+    student, 
+    lessonCount,
+    onEdit, 
+    onDelete 
+}: { 
+    student: Student, 
+    lessonCount: number,
+    onEdit: (s: Student) => void, 
+    onDelete: (s: Student) => void 
+}) {
     return (
         <TableRow key={student.uid} onClick={() => onEdit(student)} className="cursor-pointer">
             <TableCell className="font-medium">{student.name}</TableCell>
@@ -329,7 +330,7 @@ function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Stud
                 <Badge variant="outline">{courseMap[student.course]?.name || student.course}</Badge>
             </TableCell>
             <TableCell>
-                {count !== null ? `${count} / ${courseMap[student.course]?.limit || 'N/A'}` : <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                {lessonCount} / {courseMap[student.course]?.limit || 'N/A'}
             </TableCell>
             <TableCell>
                 <Badge variant={student.isActive ? 'default' : 'secondary'}>
@@ -364,6 +365,7 @@ function StudentRow({ student, currentMonth, onEdit, onDelete }: { student: Stud
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [lessonCounts, setLessonCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Partial<Student> | null>(null);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
@@ -372,6 +374,7 @@ export default function StudentsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
+    // 1. 生徒リストのリアルタイム購読
     useEffect(() => {
         setLoading(true);
         const db = getDb();
@@ -397,6 +400,11 @@ export default function StudentsPage() {
 
         return () => unsubscribe();
     }, [toast]);
+
+    // 2. 受講回数の一括取得 (N+1問題の解消)
+    useEffect(() => {
+        getMonthlyLessonCounts(currentMonth).then(setLessonCounts);
+    }, [currentMonth]);
   
   const handleStudentSelect = (student: Student) => {
     setSelectedStudent(student);
@@ -413,12 +421,12 @@ export default function StudentsPage() {
   }
 
   const handleDeleteRequest = (student: Student) => {
-      // 1. まずサイドバーを閉じる
+      // 1. まずサイドバーを閉じる (オーバーレイの競合回避)
       setIsSheetOpen(false);
-      // 2. わずかに待機してオーバーレイの競合を避けてからダイアログを表示
+      // 2. アニメーション時間を待ってから削除確認を表示
       setTimeout(() => {
           setStudentToDelete(student);
-      }, 100);
+      }, 150);
   }
 
   const handleDelete = async () => {
@@ -442,9 +450,9 @@ export default function StudentsPage() {
     <div>
       <PageHeader title="生徒管理">
         <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => handleMonthChange('prev')}>&lt;</Button>
+            <Button variant="outline" size="sm" onClick={() => handleMonthChange('prev')}>&lt;</Button>
             <span className="w-28 text-center font-semibold">{format(currentMonth, 'yyyy年 M月')}</span>
-            <Button variant="outline" onClick={() => handleMonthChange('next')}>&gt;</Button>
+            <Button variant="outline" size="sm" onClick={() => handleMonthChange('next')}>&gt;</Button>
             <Button onClick={handleNewStudent}><UserPlus className="mr-2 h-4 w-4"/>新規生徒追加</Button>
         </div>
       </PageHeader>
@@ -465,7 +473,7 @@ export default function StudentsPage() {
               <StudentRow 
                 key={student.uid} 
                 student={student} 
-                currentMonth={currentMonth} 
+                lessonCount={lessonCounts[student.uid] || 0}
                 onEdit={handleStudentSelect}
                 onDelete={handleDeleteRequest}
               />
@@ -487,7 +495,6 @@ export default function StudentsPage() {
         }}
         onStudentUpdate={() => {}}
         onDeleteRequest={handleDeleteRequest}
-        currentMonth={currentMonth}
       />
 
       <AlertDialog 
@@ -499,15 +506,15 @@ export default function StudentsPage() {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                <AlertDialogDescription>
-                    「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。
+                <AlertDialogDescription asChild>
+                    <div>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
                 <AlertDialogAction 
                     onClick={(e) => { e.preventDefault(); handleDelete(); }} 
-                    className="bg-destructive hover:bg-destructive/90"
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                     disabled={isDeleting}
                 >
                     {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
