@@ -328,7 +328,8 @@ export default function MonthlySchedulerPage() {
       }
 
       // 「移動」の場合は上限チェックをスキップ
-      const isMove = sourceSlotId !== null;
+      const effectiveSourceSlotId = sourceSlotId || allSlots.find(s => s.assignedStudentIds.includes(studentId))?.slotId || null;
+      const isMove = effectiveSourceSlotId !== null;
 
       if (!isMove) {
           const { limit } = courseMap[student.course];

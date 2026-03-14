@@ -7,11 +7,11 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loading } from '@/components/shared/Loading';
-import { getSlotsForDay, getAllStudents, fixedTimeSlotsDefinition, updateSlotAssignments } from '@/lib/data';
+import { getSlotsForDay, getAllStudents, fixedTimeSlotsDefinition, updateSlotAssignments, moveStudentBetweenSlots } from '@/lib/data';
 import type { TimeSlot, Student } from '@/lib/types';
 import { format, parseISO, isSaturday, isSunday, addDays, subDays } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, ArrowRightLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { EditSlotDialog } from '@/app/(main)/admin/schedule/page';
@@ -43,6 +43,7 @@ export default function DayDetailPage() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+  const [movingStudent, setMovingStudent] = useState<{ studentId: string, slotId: string } | null>(null);
 
   const currentDate = useMemo(() => parseISO(date), [date]);
   const currentMonth = useMemo(() => new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), [currentDate]);
@@ -56,7 +57,6 @@ export default function DayDetailPage() {
         ]).then(([slotsData, studentsData]) => {
             
             // Ensure slots exist for all fixed time definitions
-            const existingSlotTimes = new Set(slotsData.map(s => s.startTime));
             const allPossibleSlots = fixedTimeSlotsDefinition.map(timeDef => {
                 const existingSlot = slotsData.find(s => s.startTime === timeDef.startTime);
                 if (existingSlot) {
@@ -108,6 +108,18 @@ export default function DayDetailPage() {
     }
   };
 
+  const handleMoveExecute = async (targetSlotId: string) => {
+    if (!movingStudent) return;
+    try {
+        await moveStudentBetweenSlots(movingStudent.studentId, movingStudent.slotId, targetSlotId);
+        toast({ title: "移動完了", description: "レッスンを移動しました。" });
+        setMovingStudent(null);
+        fetchData();
+    } catch (error: any) {
+        toast({ title: "エラー", description: error.message || "移動に失敗しました。", variant: "destructive" });
+    }
+  };
+
 
   if (loading) return <Loading />;
 
@@ -126,24 +138,40 @@ export default function DayDetailPage() {
         </div>
       </PageHeader>
 
+      {movingStudent && (
+        <div className="mb-4 p-4 bg-primary/10 border border-primary rounded-lg flex justify-between items-center animate-in fade-in slide-in-from-top-2">
+            <p className="text-sm font-medium">
+                <span className="font-bold">{allStudents.find(s => s.uid === movingStudent.studentId)?.name}</span> さんの移動先を選択してください。
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setMovingStudent(null)}>キャンセル</Button>
+        </div>
+      )}
+
       <div className="space-y-4">
         {slots.map(slot => {
           const occupancy = slot.assignedStudentIds.length;
           const capacity = slot.capacity;
           const isFull = occupancy >= capacity;
+          const isMovingToThisSlot = movingStudent && movingStudent.slotId !== slot.slotId;
 
           return (
-            <Card key={slot.slotId}>
+            <Card key={slot.slotId} className={cn(movingStudent?.slotId === slot.slotId ? 'border-primary ring-1 ring-primary' : '')}>
               <CardHeader className="pb-4">
                 <div className="flex justify-between items-center">
                   <CardTitle className="font-headline text-xl">{slot.startTime} - {slot.endTime}</CardTitle>
-                  <div className="flex items-center gap-4">
-                    <span className={cn('font-semibold', isFull ? 'text-destructive' : '')}>{isFull ? '満席' : `残り${capacity - occupancy}`}</span>
-                    <span className="text-muted-foreground">{occupancy} / {capacity}人</span>
-                     <Button variant="outline" size="sm" onClick={() => setEditingSlot(slot)}>
-                        <UserPlus className="mr-2 h-4 w-4"/>
-                        生徒を割り当て
-                    </Button>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('font-semibold mr-4', isFull ? 'text-destructive' : '')}>{isFull ? '満席' : `残り${capacity - occupancy}`}</span>
+                    {isMovingToThisSlot ? (
+                        <Button size="sm" disabled={isFull} onClick={() => handleMoveExecute(slot.slotId)}>
+                            <ArrowRightLeft className="mr-2 h-4 w-4" />
+                            ここに移動
+                        </Button>
+                    ) : (
+                        <Button variant="outline" size="sm" onClick={() => setEditingSlot(slot)}>
+                            <UserPlus className="mr-2 h-4 w-4"/>
+                            追加・編集
+                        </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -152,8 +180,17 @@ export default function DayDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {slot.assignedStudentIds.map(studentId => {
                       const student = allStudents.find(s => s.uid === studentId);
+                      const isSelectedForMove = movingStudent?.studentId === studentId && movingStudent?.slotId === slot.slotId;
+                      
                       return student ? (
-                        <div key={studentId} className="p-3 bg-muted/50 rounded-lg flex justify-between items-center">
+                        <div 
+                            key={studentId} 
+                            onClick={() => setMovingStudent(isSelectedForMove ? null : { studentId, slotId: slot.slotId })}
+                            className={cn(
+                                "p-3 rounded-lg flex justify-between items-center cursor-pointer transition-all border",
+                                isSelectedForMove ? "border-primary bg-primary/10 ring-2 ring-primary" : "bg-muted/50 hover:bg-muted border-transparent"
+                            )}
+                        >
                           <div>
                             <p className="font-semibold">{student.name}</p>
                             {student.displayTag && <p className="text-sm text-muted-foreground">{student.displayTag}</p>}

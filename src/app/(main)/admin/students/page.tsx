@@ -415,9 +415,10 @@ export default function StudentsPage() {
   const handleDeleteRequest = (student: Student) => {
       // 1. まずサイドバーを閉じる
       setIsSheetOpen(false);
-      // 2. サイドバーのアニメーションが終わるのを待たずに、
-      // 削除対象をセットしてダイアログを表示（独立したステート管理なので安全）
-      setStudentToDelete(student);
+      // 2. わずかに待機してオーバーレイの競合を避けてからダイアログを表示
+      setTimeout(() => {
+          setStudentToDelete(student);
+      }, 100);
   }
 
   const handleDelete = async () => {
@@ -498,8 +499,8 @@ export default function StudentsPage() {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                    <div>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</div>
+                <AlertDialogDescription>
+                    「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
