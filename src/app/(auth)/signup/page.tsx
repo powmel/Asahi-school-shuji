@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -10,10 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Brush } from 'lucide-react';
+import { Brush, Loader2 } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SignupPage() {
@@ -43,10 +42,11 @@ export default function SignupPage() {
         return;
     }
 
+    let user;
     try {
       // 1. Authユーザー作成
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      user = userCredential.user;
 
       // 2. プロフィール更新
       await updateProfile(user, { displayName: name });
@@ -65,16 +65,20 @@ export default function SignupPage() {
       router.push('/');
 
     } catch (error: any) {
-        let errorMessage = '予期せぬエラーが発生しました。';
+        console.error('Signup Error:', error);
         
+        // Firestoreへの書き込みに失敗した場合、Authユーザーだけ残るのを防ぐために削除を試みる
+        if (user && error.code !== 'auth/email-already-in-use') {
+            try { await deleteUser(user); } catch (e) { console.error('Cleanup error:', e); }
+        }
+
+        let errorMessage = '予期せぬエラーが発生しました。';
         if (error.code === 'auth/email-already-in-use') {
-            errorMessage = 'このメールアドレスは既に登録されています。ログイン画面からお試しください。';
+            errorMessage = 'このメールアドレスは既に登録されています。心当たりがない場合は、以前の登録が中途半端に終わっている可能性があります。ログイン画面からお試しください。';
         } else if (error.code === 'auth/weak-password') {
             errorMessage = 'パスワードが弱すぎます。別のパスワードをお試しください。';
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = 'メールアドレスの形式が正しくありません。';
         } else if (error.code === 'permission-denied') {
-            errorMessage = 'データの保存権限がありません。管理者にお問い合わせください。';
+            errorMessage = 'データベースへの保存権限がありません。管理者にお問い合わせください。';
         }
 
         toast({
@@ -152,6 +156,7 @@ export default function SignupPage() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full font-bold" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {isLoading ? '作成中...' : 'アカウントを作成'}
             </Button>
           </CardFooter>
