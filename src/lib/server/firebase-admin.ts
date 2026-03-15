@@ -2,7 +2,7 @@ import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  // 文字列の "undefined" や空文字の場合に JSON.parse でクラッシュするのを防ぐ
+  
   if (key && typeof key === 'string' && key.trim() !== '' && key !== 'undefined' && key !== 'null') {
     try {
       const serviceAccount = JSON.parse(key);
