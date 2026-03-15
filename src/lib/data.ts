@@ -205,6 +205,7 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
 
 /**
  * Optimized: Resolves the N+1 problem by fetching all lessons for a month in one batch.
+ * This is crucial for avoiding long loading times.
  */
 export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
@@ -409,7 +410,7 @@ export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' |
 };
 
 /**
- * Optimized: Fetches all swap requests with student and lesson details in batch to avoid N+1.
+ * Optimized: Fetches all swap requests with student and lesson details in batch.
  */
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
     const db = getDb();
@@ -418,7 +419,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     if (requests.length === 0) return [];
 
-    // Optimization: Batch fetch all students and lessons
+    // Optimization: Batch fetch all students and lessons to avoid N+1
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 

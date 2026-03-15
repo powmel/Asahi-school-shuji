@@ -60,9 +60,15 @@ export default function SignupPage() {
 
       // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
     } catch (error: any) {
+        let errorMessage = error.message || '予期せぬエラーが発生しました。';
+        
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'このメールアドレスは既に登録されています。ログイン画面からお試しください。';
+        }
+
         toast({
             title: 'サインアップエラー',
-            description: error.message || '予期せぬエラーが発生しました。',
+            description: errorMessage,
             variant: 'destructive',
         });
     } finally {

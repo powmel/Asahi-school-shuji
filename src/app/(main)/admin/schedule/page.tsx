@@ -70,6 +70,7 @@ export function EditSlotDialog({
 
   useEffect(() => {
     if (open && allStudents.length > 0 && slot) {
+      // Use the optimized batch counting
       getMonthlyLessonCounts(currentMonth).then(setStudentMonthlyCounts);
     }
   }, [open, allStudents, currentMonth, slot]);
