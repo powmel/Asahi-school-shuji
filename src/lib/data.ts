@@ -404,7 +404,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     if (requests.length === 0) return [];
 
-    // Optimize: Batch fetch all students and lessons
+    // Optimization: Batch fetch all students and lessons
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 
