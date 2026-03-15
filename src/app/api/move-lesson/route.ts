@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   const idToken = authorization.split('Bearer ')[1];
 
   if (!lessonId || !targetSlotId) {
-    return NextResponse.json({ error: 'レッスンIDと移動先スロットIDは必須です。' }, { status: 400 });
+    return NextResponse.json({ error: '必須項目が不足しています。' }, { status: 400 });
   }
 
   try {
@@ -50,38 +51,7 @@ export async function POST(request: Request) {
       const lessonData = lessonDoc.data();
       
       if (lessonData?.studentId !== linkedStudentId) {
-        throw new Error('このレッスンを移動する権限がありません。');
-      }
-      
-      if (lessonData?.status !== 'scheduled' && lessonData?.status !== 'approved') {
-        throw new Error('このレッスンは移動できません。');
-      }
-      
-      if (lessonData?.slotId === targetSlotId) {
-        throw new Error('移動元と移動先が同じです。');
-      }
-
-      const targetSlotLessonsQuery = adminDb.collection('lessons')
-        .where('slotId', '==', targetSlotId)
-        .where('status', 'in', ['approved', 'scheduled']);
-      
-      const targetSlotLessonsSnap = await transaction.get(targetSlotLessonsQuery);
-      const targetSlotStudentIds = new Set(
-        targetSlotLessonsSnap.docs.map(doc => doc.data().studentId)
-      );
-      
-      if (targetSlotStudentIds.has(linkedStudentId)) {
-        throw new Error('移動先の時間帯に既に予約があります。');
-      }
-      
-      const settingsDocRef = adminDb.collection('settings').doc('app');
-      const settingsDoc = await transaction.get(settingsDocRef);
-      const settings = settingsDoc.exists ? settingsDoc.data() : { defaultSlotCapacity: 4 };
-      const capacity = settings?.defaultSlotCapacity || 4;
-      const currentCount = targetSlotStudentIds.size;
-      
-      if (currentCount >= capacity) {
-        throw new Error('移動先の時間帯が満席です。');
+        throw new Error('権限がありません。');
       }
 
       transaction.update(lessonRef, {
@@ -90,13 +60,10 @@ export async function POST(request: Request) {
       });
     });
 
-    return NextResponse.json({ message: 'レッスンを移動しました。' }, { status: 200 });
+    return NextResponse.json({ message: '成功' }, { status: 200 });
 
   } catch (error: any) {
     console.error('Error moving lesson:', error);
-    if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-      return NextResponse.json({ error: '認証エラーが発生しました。再度ログインしてください。' }, { status: 401 });
-    }
     return NextResponse.json({ error: error.message || 'サーバーエラーが発生しました。' }, { status: 400 });
   }
 }

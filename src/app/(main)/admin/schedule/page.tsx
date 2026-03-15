@@ -184,13 +184,11 @@ export function EditSlotDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>月間上限超過の確認</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2">
-                <p>以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？</p>
-                <ul className="mt-2 list-disc list-inside">
-                  {studentsToConfirm.map(s => <li key={s.uid}>{s.name}</li>)}
-                </ul>
-              </div>
+            <AlertDialogDescription>
+              以下の生徒は月間の授業回数上限を超えます。本当に割り当てますか？
+              <ul className="mt-2 list-disc list-inside">
+                {studentsToConfirm.map(s => <li key={s.uid}>{s.name}</li>)}
+              </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -275,17 +273,17 @@ export default function SchedulePage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" disabled>
                 <Settings className="mr-2 h-4 w-4" />
-                開講日設定 (準備中)
+                開講日設定
             </Button>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button variant="outline" disabled>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        自動割り振り (準備中)
+                        自動割り振り
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>日時指定を優先し、月2・月3コースを考慮して自動配置する機能は今後追加予定</p>
+                    <p>希望を考慮した自動配置機能（今後追加予定）</p>
                 </TooltipContent>
             </Tooltip>
 
@@ -355,7 +353,7 @@ export default function SchedulePage() {
                                     const student = allStudents.find(s => s.uid === studentId);
                                     return (
                                         <div key={studentId} className="bg-muted/50 text-foreground text-[10px] px-1.5 py-0.5 rounded-sm truncate">
-                                            {student?.name || '不明な生徒'}
+                                            {student?.name || '不明'}
                                         </div>
                                     )
                                 })}

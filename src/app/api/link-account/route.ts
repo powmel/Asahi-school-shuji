@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
@@ -43,22 +44,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '連携トークンが正しくありません。' }, { status: 400 });
     }
 
-    const expiresAt = (studentData.linkTokenExpiresAt as Timestamp).toDate();
-    if (new Date() > expiresAt) {
-      return NextResponse.json({ error: '連携トークンの有効期限が切れています。管理者に連絡してください。' }, { status: 400 });
-    }
-
-    // All checks passed, perform the link
     const batch = adminDb.batch();
 
-    // 1. Update student document
     batch.update(studentDoc.ref, {
       linkedUserId: uid,
       linkToken: FieldValue.delete(),
       linkTokenExpiresAt: FieldValue.delete(),
     });
 
-    // 2. Update user document
     const userDocRef = adminDb.collection('users').doc(uid);
     batch.update(userDocRef, {
       linkedStudentId: studentDoc.id,
@@ -66,13 +59,10 @@ export async function POST(request: Request) {
 
     await batch.commit();
 
-    return NextResponse.json({ message: 'アカウントの連携に成功しました。' }, { status: 200 });
+    return NextResponse.json({ message: '成功' }, { status: 200 });
 
   } catch (error: any) {
     console.error('Error linking account:', error);
-    if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-        return NextResponse.json({ error: '認証エラーが発生しました。再度ログインしてください。' }, { status: 401 });
-    }
     return NextResponse.json({ error: 'サーバーエラーが発生しました。' }, { status: 500 });
   }
 }

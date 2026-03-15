@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, useMemo } from 'react';
@@ -54,8 +55,6 @@ export default function DayDetailPage() {
             getSlotsForDay(date),
             getAllStudents(),
         ]).then(([slotsData, studentsData]) => {
-            
-            // Ensure slots exist for all fixed time definitions
             const allPossibleSlots = fixedTimeSlotsDefinition.map(timeDef => {
                 const existingSlot = slotsData.find(s => s.startTime === timeDef.startTime);
                 if (existingSlot) {
@@ -66,7 +65,7 @@ export default function DayDetailPage() {
                     date: date,
                     startTime: timeDef.startTime,
                     endTime: timeDef.endTime,
-                    capacity: 4, // Default capacity
+                    capacity: 4,
                     assignedStudentIds: [],
                 };
             });

@@ -109,7 +109,7 @@ function PreferredSlotDialog({
                 <DialogHeader>
                     <DialogTitle>授業時間指定</DialogTitle>
                     <DialogDescription>
-                        {student.name}さんの希望日時を設定します。有効にすると、空きがある場合に自動で予約が確保されます。
+                        {student.name}さんの希望日時を設定します。
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-6">
@@ -218,7 +218,7 @@ function StudentSheet({
                 <SheetContent className="sm:max-w-lg overflow-y-auto bg-background">
                     <SheetHeader>
                         <SheetTitle>{isNew ? "新規生徒追加" : student.name}</SheetTitle>
-                        <SheetDescription>{isNew ? "新しい生徒の詳細情報を入力してください。" : "生徒の詳細情報を確認・編集します。"}</SheetDescription>
+                        <SheetDescription>{isNew ? "詳細情報を入力してください。" : "詳細情報を編集します。"}</SheetDescription>
                     </SheetHeader>
                     <div className="space-y-6 py-6">
                         {!isNew && (
@@ -237,10 +237,9 @@ function StudentSheet({
                                         <Input readOnly value={formData.linkToken || '生成中...'} className="bg-muted" />
                                         {formData.linkToken && <CopyToClipboard text={formData.linkToken} />}
                                     </div>
-                                    {formData.linkTokenExpiresAt && <p className="text-xs text-muted-foreground">有効期限: {format((formData.linkTokenExpiresAt as any), 'yyyy/MM/dd HH:mm')}</p>}
                                 </div>
                                  <p className="text-xs text-muted-foreground">
-                                    {formData.linkedUserId ? `連携済み (ユーザーID: ${formData.linkedUserId.substring(0,10)}...)` : '未連携'}
+                                    {formData.linkedUserId ? `連携済み` : '未連携'}
                                 </p>
                             </div>
                         )}
@@ -375,7 +374,6 @@ export default function StudentsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-    // 1. 生徒リストのリアルタイム購読
     useEffect(() => {
         setLoading(true);
         const db = getDb();
@@ -402,7 +400,6 @@ export default function StudentsPage() {
         return () => unsubscribe();
     }, [toast]);
 
-    // 2. 受講回数の一括取得 (N+1問題の解消)
     useEffect(() => {
         getMonthlyLessonCounts(currentMonth).then(setLessonCounts);
     }, [currentMonth]);
@@ -422,9 +419,9 @@ export default function StudentsPage() {
   }
 
   const handleDeleteRequest = (student: Student) => {
-      // 1. まずサイドバーを閉じる (オーバーレイの競合回避)
+      // 背景の膜（オーバーレイ）の競合を避けるため、まずサイドバーを閉じる
       setIsSheetOpen(false);
-      // 2. アニメーション時間を待ってから削除確認を表示
+      // サイドバーが閉じるアニメーションを待ってから、削除確認ダイアログを表示
       setTimeout(() => {
           setStudentToDelete(student);
       }, 150);
@@ -436,7 +433,6 @@ export default function StudentsPage() {
       try {
           await deleteStudent(studentToDelete.uid);
           setStudentToDelete(null);
-          setSelectedStudent(null);
           toast({ title: '成功', description: '生徒が削除されました。'});
       } catch (error: any) {
           toast({ title: '失敗', description: error.message || '削除に失敗しました。', variant: 'destructive'});
@@ -507,8 +503,8 @@ export default function StudentsPage() {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                    <p>「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。</p>
+                <AlertDialogDescription>
+                    「{studentToDelete?.name}」さんを削除します。関連する全てのレッスン予約も削除されます。
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

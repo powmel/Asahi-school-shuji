@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { format } from 'date-fns';
@@ -99,9 +100,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error getting available slots:', error);
-    if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-      return NextResponse.json({ error: '認証エラーが発生しました。再度ログインしてください。' }, { status: 401 });
-    }
     return NextResponse.json({ error: error.message || 'サーバーエラーが発生しました。' }, { status: 500 });
   }
 }
