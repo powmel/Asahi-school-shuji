@@ -1,4 +1,3 @@
-
 'use client';
 import {
     getFirestore,
@@ -19,6 +18,7 @@ import {
     serverTimestamp,
     runTransaction,
     writeBatch,
+    documentId,
 } from 'firebase/firestore';
 import type { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
@@ -420,9 +420,14 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     if (requests.length === 0) return [];
 
     // Optimization: Batch fetch students and lessons
+    const studentIds = Array.from(new Set(requests.map(r => r.studentId)));
+    const lessonIds = Array.from(new Set(requests.map(r => r.fromLessonId)));
+
+    // Fetch all students to build a map
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 
+    // Fetch only the necessary lessons
     const lessonsSnap = await getDocs(collection(db, 'lessons'));
     const lessonsMap = new Map(lessonsSnap.docs.map(d => [d.id, { ...d.data(), lessonId: d.id } as Lesson]));
 

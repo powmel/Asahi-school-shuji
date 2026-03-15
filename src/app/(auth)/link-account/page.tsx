@@ -84,7 +84,7 @@ export default function LinkAccountPage() {
     } catch (error: any) {
         toast({
             title: '連携エラー',
-            description: error.message || '予期せぬエラーが発生しました。',
+            description: 'おそらく連携がうまく行ってない。トークンや生徒コードの認証はどうやってるの？',
             variant: 'destructive',
         });
     } finally {
@@ -112,7 +112,7 @@ export default function LinkAccountPage() {
               <Label htmlFor="student-code">生徒コード</Label>
               <Input
                 id="student-code"
-                placeholder="例: @1210001"
+                placeholder="例: @std0001"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
                 required
