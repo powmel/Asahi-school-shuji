@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -370,7 +369,9 @@ export default function SchedulePage() {
         </div>
          <EditSlotDialog
           open={!!editingSlot}
-          onOpenChange={(isOpen) => !isOpen && setEditingSlot(null)}
+          onOpenChange={(isOpen) => {
+              if(!isOpen) setEditingSlot(null);
+          }}
           slot={editingSlot}
           allStudents={allStudents}
           onSave={handleSlotSave}
