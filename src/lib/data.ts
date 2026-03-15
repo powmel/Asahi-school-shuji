@@ -1,4 +1,3 @@
-
 'use client';
 import {
     getFirestore,
@@ -403,16 +402,35 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     const snapshot = await getDocs(collection(db, 'swapRequests'));
     const requests = snapshot.docs.map(doc => ({ ...doc.data(), requestId: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as SwapRequest));
     
-    const detailedRequests: SwapRequestWithDetails[] = [];
-    for(const req of requests) {
-        const user = { uid: 'admin' };
-        const lesson = await getLessonDetails(req.fromLessonId, user.uid); 
-        const student = await getStudentDetails(req.studentId);
-        if(student && lesson) {
-            detailedRequests.push({ ...req, studentName: student.name, fromLesson: lesson });
-        }
-    }
-    return detailedRequests;
+    if (requests.length === 0) return [];
+
+    // Optimize: Batch fetch all students and lessons
+    const students = await getAllStudents();
+    const studentsMap = new Map(students.map(s => [s.uid, s]));
+
+    const lessonsSnap = await getDocs(collection(db, 'lessons'));
+    const lessonsMap = new Map(lessonsSnap.docs.map(d => [d.id, { ...d.data(), lessonId: d.id } as Lesson]));
+
+    return requests.map(req => {
+        const student = studentsMap.get(req.studentId);
+        const lesson = lessonsMap.get(req.fromLessonId);
+        
+        if (!student || !lesson) return null;
+
+        const lessonWithDetails: LessonWithDetails = {
+            ...lesson,
+            studentName: student.name,
+            slotDate: lesson.slotId.substring(0, 10),
+            slotStartTime: lesson.slotId.substring(11),
+            slotEndTime: fixedTimeSlotsDefinition.find(fts => fts.startTime === lesson.slotId.substring(11))?.endTime || '',
+        };
+
+        return {
+            ...req,
+            studentName: student.name,
+            fromLesson: lessonWithDetails,
+        };
+    }).filter((r): r is SwapRequestWithDetails => r !== null);
 };
 
 export const updateSwapRequestStatus = async (requestId: string, status: 'approved' | 'rejected'): Promise<void> => {
