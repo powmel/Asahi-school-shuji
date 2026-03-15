@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
   env: {
     FIREBASE_SERVICE_ACCOUNT_KEY: process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
   },
+  // Experimental features moved to top level if supported or removed if not
 };
 
 export default nextConfig;

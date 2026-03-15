@@ -418,9 +418,9 @@ export default function StudentsPage() {
   }
 
   const handleDeleteRequest = (student: Student) => {
-      // 背景の膜（オーバーレイ）の競合を避けるため、まずサイドバーを閉じる
+      // Background overlay conflict fix: Close sheet first
       setIsSheetOpen(false);
-      // サイドバーが閉じるアニメーションを待ってから、削除確認ダイアログを表示
+      // Wait for animation to complete before showing dialog
       setTimeout(() => {
           setStudentToDelete(student);
       }, 150);

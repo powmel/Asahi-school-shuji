@@ -204,7 +204,7 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
 };
 
 /**
- * Resolves the N+1 problem by fetching all lessons for a month in one batch.
+ * Optimized: Resolves the N+1 problem by fetching all lessons for a month in one batch.
  */
 export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
@@ -408,6 +408,9 @@ export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' |
     await batch.commit();
 };
 
+/**
+ * Optimized: Fetches all swap requests with student and lesson details in batch.
+ */
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
     const db = getDb();
     const snapshot = await getDocs(collection(db, 'swapRequests'));
