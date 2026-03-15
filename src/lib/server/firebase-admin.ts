@@ -3,8 +3,8 @@ import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  // ビルド環境や未設定時に "undefined" という文字列が入る場合があるため、厳密にチェック
-  if (key && typeof key === 'string' && key.trim() !== '' && key !== 'undefined') {
+  // 環境変数が未設定や、文字列の "undefined" として渡された場合を厳密にチェック
+  if (key && typeof key === 'string' && key.trim() !== '' && key !== 'undefined' && key !== 'null') {
     try {
       const serviceAccount = JSON.parse(key);
       admin.initializeApp({
@@ -21,5 +21,5 @@ if (!admin.apps.length) {
   }
 }
 
-export const adminDb = admin.apps.length ? admin.firestore() : null as any;
-export const adminAuth = admin.apps.length ? admin.auth() : null as any;
+export const adminDb = admin.apps.length ? admin.firestore() : null;
+export const adminAuth = admin.apps.length ? admin.auth() : null;
