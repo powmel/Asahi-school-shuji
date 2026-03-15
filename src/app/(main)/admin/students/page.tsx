@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -234,7 +235,7 @@ function StudentSheet({
                                     <Label>連携トークン</Label>
                                     <div className="flex items-center">
                                         <Input readOnly value={formData.linkToken || '生成中...'} className="bg-muted" />
-                                        {formData.linkToken && <CopyToClipboard text={formData.linkToken} />}
+                                        {formData.studentCode && <CopyToClipboard text={formData.linkToken || ''} />}
                                     </div>
                                 </div>
                                  <p className="text-xs text-muted-foreground">
@@ -400,7 +401,7 @@ export default function StudentsPage() {
     }, [toast]);
 
     useEffect(() => {
-        // Optimized: get all counts in one batch
+        // Use optimized batch counts
         getMonthlyLessonCounts(currentMonth).then(setLessonCounts);
     }, [currentMonth]);
   
@@ -419,9 +420,9 @@ export default function StudentsPage() {
   }
 
   const handleDeleteRequest = (student: Student) => {
-      // Background overlay conflict fix: Close sheet first to avoid double overlay freeze
+      // Background overlay freeze fix: Close the sheet first
       setIsSheetOpen(false);
-      // Wait for animation to complete before showing dialog
+      // Wait for the overlay transition to finish before showing the dialog
       setTimeout(() => {
           setStudentToDelete(student);
       }, 150);

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -42,13 +43,14 @@ export default function SignupPage() {
     }
 
     try {
+      // 1. Authユーザー作成
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Update user profile
+      // 2. プロフィール更新
       await updateProfile(user, { displayName: name });
 
-      // Create user document in Firestore
+      // 3. Firestoreにユーザードキュメント作成
       const userDocRef = doc(firestore, 'users', user.uid);
       await setDoc(userDocRef, {
         uid: user.uid,
@@ -58,12 +60,18 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
 
-      // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
+      // 成功時はトップページへリダイレクト（FirebaseProviderが監視）
+      router.push('/');
+
     } catch (error: any) {
-        let errorMessage = error.message || '予期せぬエラーが発生しました。';
+        let errorMessage = '予期せぬエラーが発生しました。';
         
         if (error.code === 'auth/email-already-in-use') {
             errorMessage = 'このメールアドレスは既に登録されています。ログイン画面からお試しください。';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'パスワードが弱すぎます。別のパスワードをお試しください。';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'メールアドレスの形式が正しくありません。';
         }
 
         toast({
