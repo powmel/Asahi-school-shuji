@@ -11,6 +11,9 @@ import {
     deleteDoc,
     query,
     where,
+    orderBy,
+    startAt,
+    endAt,
     Timestamp,
     serverTimestamp,
     runTransaction,
@@ -207,26 +210,29 @@ export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string
     const monthStr = format(month, 'yyyy-MM');
     const q = query(
         collection(getDb(), 'lessons'), 
-        where('status', 'in', ['approved', 'scheduled'])
+        where('status', 'in', ['approved', 'scheduled']),
+        where('slotId', '>=', monthStr),
+        where('slotId', '<=', monthStr + '\uf8ff')
     );
     const snapshot = await getDocs(q);
     const counts: Record<string, number> = {};
     snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (data.slotId.startsWith(monthStr)) {
-            counts[data.studentId] = (counts[data.studentId] || 0) + 1;
-        }
+        counts[data.studentId] = (counts[data.studentId] || 0) + 1;
     });
     return counts;
 };
 
 export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     const monthStr = format(month, 'yyyy-MM');
-    const lessonsQuery = query(collection(getDb(), 'lessons'), where('status', 'in', ['approved', 'scheduled']));
+    const lessonsQuery = query(
+        collection(getDb(), 'lessons'), 
+        where('status', 'in', ['approved', 'scheduled']),
+        where('slotId', '>=', monthStr),
+        where('slotId', '<=', monthStr + '\uf8ff')
+    );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    const lessonsInMonth = lessonsSnapshot.docs
-        .map(d => d.data() as Lesson)
-        .filter(l => l.slotId.startsWith(monthStr));
+    const lessonsInMonth = lessonsSnapshot.docs.map(d => d.data() as Lesson);
 
     const slotsMap: Map<string, TimeSlot> = new Map();
     const settings = await getAppSettings();
@@ -258,9 +264,14 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
 }
 
 export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
-    const lessonsQuery = query(collection(getDb(), 'lessons'), where('status', 'in', ['approved', 'scheduled']));
+    const lessonsQuery = query(
+        collection(getDb(), 'lessons'), 
+        where('status', 'in', ['approved', 'scheduled']),
+        where('slotId', '>=', date),
+        where('slotId', '<=', date + '\uf8ff')
+    );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    const lessonsOnDay = lessonsSnapshot.docs.map(d => d.data() as Lesson).filter(l => l.slotId.startsWith(date));
+    const lessonsOnDay = lessonsSnapshot.docs.map(d => d.data() as Lesson);
     
     const slotsMap: Map<string, TimeSlot> = new Map();
     const settings = await getAppSettings();
@@ -404,7 +415,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     if (requests.length === 0) return [];
 
-    // Optimization: Batch fetch all students and lessons
+    // Optimization: Batch fetch all students and lessons to avoid N+1 problem
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 
