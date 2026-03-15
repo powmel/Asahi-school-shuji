@@ -409,7 +409,7 @@ export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' |
 };
 
 /**
- * Optimized: Fetches all swap requests with student and lesson details in batch.
+ * Optimized: Fetches all swap requests with student and lesson details in batch to avoid N+1.
  */
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
     const db = getDb();
@@ -418,7 +418,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     if (requests.length === 0) return [];
 
-    // Optimization: Batch fetch all students and lessons to avoid N+1 problem
+    // Optimization: Batch fetch all students and lessons
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 

@@ -418,7 +418,7 @@ export default function StudentsPage() {
   }
 
   const handleDeleteRequest = (student: Student) => {
-      // Background overlay conflict fix: Close sheet first
+      // Background overlay conflict fix: Close sheet first to avoid double overlay freeze
       setIsSheetOpen(false);
       // Wait for animation to complete before showing dialog
       setTimeout(() => {

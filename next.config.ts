@@ -33,7 +33,12 @@ const nextConfig: NextConfig = {
   env: {
     FIREBASE_SERVICE_ACCOUNT_KEY: process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
   },
-  // Experimental features moved to top level if supported or removed if not
+  experimental: {
+    // Only configure if explicitly needed by logs, and ensure correct nesting
+    allowedDevOrigins: [
+      "6000-firebase-studio-1765635753378.cluster-isls3qj2gbd5qs4jkjqvhahfv6.cloudworkstations.dev"
+    ]
+  }
 };
 
 export default nextConfig;
