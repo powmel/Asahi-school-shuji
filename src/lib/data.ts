@@ -1,3 +1,4 @@
+
 'use client';
 import {
     getFirestore,
@@ -206,12 +207,13 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
 
 /**
  * 授業回数の一括集計 (N+1問題の解決)
+ * インデックスエラーを回避するため、statusフィルタをメモリ上で行う
  */
 export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
+    // シンプルなクエリにしてインデックス不要にする
     const q = query(
         collection(getDb(), 'lessons'), 
-        where('status', 'in', ['approved', 'scheduled']),
         where('slotId', '>=', monthStr),
         where('slotId', '<=', monthStr + '\uf8ff')
     );
@@ -219,7 +221,10 @@ export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string
     const counts: Record<string, number> = {};
     snapshot.docs.forEach(doc => {
         const data = doc.data();
-        counts[data.studentId] = (counts[data.studentId] || 0) + 1;
+        // メモリ上でフィルタリング
+        if (['approved', 'scheduled'].includes(data.status)) {
+            counts[data.studentId] = (counts[data.studentId] || 0) + 1;
+        }
     });
     return counts;
 };
@@ -228,12 +233,14 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
     const monthStr = format(month, 'yyyy-MM');
     const lessonsQuery = query(
         collection(getDb(), 'lessons'), 
-        where('status', 'in', ['approved', 'scheduled']),
         where('slotId', '>=', monthStr),
         where('slotId', '<=', monthStr + '\uf8ff')
     );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    const lessonsInMonth = lessonsSnapshot.docs.map(d => d.data() as Lesson);
+    // メモリ上でフィルタリング
+    const lessonsInMonth = lessonsSnapshot.docs
+        .map(d => d.data() as Lesson)
+        .filter(l => ['approved', 'scheduled'].includes(l.status));
 
     const slotsMap: Map<string, TimeSlot> = new Map();
     const settings = await getAppSettings();
@@ -267,12 +274,14 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
 export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
     const lessonsQuery = query(
         collection(getDb(), 'lessons'), 
-        where('status', 'in', ['approved', 'scheduled']),
         where('slotId', '>=', date),
         where('slotId', '<=', date + '\uf8ff')
     );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    const lessonsOnDay = lessonsSnapshot.docs.map(d => d.data() as Lesson);
+    // メモリ上でフィルタリング
+    const lessonsOnDay = lessonsSnapshot.docs
+        .map(d => d.data() as Lesson)
+        .filter(l => ['approved', 'scheduled'].includes(l.status));
     
     const slotsMap: Map<string, TimeSlot> = new Map();
     const settings = await getAppSettings();
@@ -303,14 +312,17 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
     const db = getDb();
     
     await runTransaction(db, async (transaction) => {
-        const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId), where('status', 'in', ['approved', 'scheduled']));
+        const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
         const currentLessonsSnap = await getDocs(lessonsQuery);
         
-        const currentStudentIds = new Set(currentLessonsSnap.docs.map(doc => doc.data().studentId));
+        // フィルタリング
+        const filteredDocs = currentLessonsSnap.docs.filter(d => ['approved', 'scheduled'].includes(d.data().status));
+        
+        const currentStudentIds = new Set(filteredDocs.map(doc => doc.data().studentId));
         const newStudentIds = new Set(studentIds);
 
         // Students to remove
-        for (const doc of currentLessonsSnap.docs) {
+        for (const doc of filteredDocs) {
             const studentId = doc.data().studentId;
             if (!newStudentIds.has(studentId)) {
                 transaction.delete(doc.ref);
@@ -343,13 +355,14 @@ export const moveStudentBetweenSlots = async (studentId: string, fromSlotId: str
         const q = query(
             collection(db, 'lessons'), 
             where('studentId', '==', studentId), 
-            where('slotId', '==', fromSlotId),
-            where('status', 'in', ['approved', 'scheduled'])
+            where('slotId', '==', fromSlotId)
         );
         const snapshot = await getDocs(q);
         
-        if (!snapshot.empty) {
-            const lessonDoc = snapshot.docs[0];
+        // メモリ上でステータス確認
+        const lessonDoc = snapshot.docs.find(d => ['approved', 'scheduled'].includes(d.data().status));
+        
+        if (lessonDoc) {
             // Delete old
             transaction.delete(lessonDoc.ref);
             
@@ -419,12 +432,10 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     
     if (requests.length === 0) return [];
 
-    // Optimization: Batch fetch students and lessons
-    // Fetch all students to build a map
+    // 一括取得で高速化
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
 
-    // Fetch all lessons to build a map
     const lessonsSnap = await getDocs(collection(db, 'lessons'));
     const lessonsMap = new Map(lessonsSnap.docs.map(d => [d.id, { ...d.data(), lessonId: d.id } as Lesson]));
 
