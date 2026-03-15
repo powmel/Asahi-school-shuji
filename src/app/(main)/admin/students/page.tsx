@@ -401,7 +401,6 @@ export default function StudentsPage() {
     }, [toast]);
 
     useEffect(() => {
-        // Use optimized batch counts
         getMonthlyLessonCounts(currentMonth).then(setLessonCounts);
     }, [currentMonth]);
   

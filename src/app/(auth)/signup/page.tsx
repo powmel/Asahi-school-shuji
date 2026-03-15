@@ -30,6 +30,7 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
 
     if (password.length < 6) {
@@ -60,7 +61,7 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
 
-      // 成功時はトップページへリダイレクト（FirebaseProviderが監視）
+      toast({ title: '成功', description: 'アカウントを作成しました。' });
       router.push('/');
 
     } catch (error: any) {
@@ -72,6 +73,8 @@ export default function SignupPage() {
             errorMessage = 'パスワードが弱すぎます。別のパスワードをお試しください。';
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = 'メールアドレスの形式が正しくありません。';
+        } else if (error.code === 'permission-denied') {
+            errorMessage = 'データの保存権限がありません。管理者にお問い合わせください。';
         }
 
         toast({
@@ -79,7 +82,6 @@ export default function SignupPage() {
             description: errorMessage,
             variant: 'destructive',
         });
-    } finally {
         setIsLoading(false);
     }
   };

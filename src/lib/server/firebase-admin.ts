@@ -4,7 +4,7 @@ import admin from 'firebase-admin';
 if (!admin.apps.length) {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   
-  // Robust check: Ignore if string is "undefined" or empty to prevent JSON parse errors
+  // Robust check: Ignore if string is "undefined", "null", or empty to prevent JSON parse errors
   if (key && typeof key === 'string' && key.trim() !== '' && key !== 'undefined' && key !== 'null') {
     try {
       const serviceAccount = JSON.parse(key);
