@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/server/firebase-admin';
 import { format } from 'date-fns';
@@ -44,14 +45,16 @@ export async function POST(request: Request) {
     const settings = settingsDoc.exists ? settingsDoc.data() : { defaultSlotCapacity: 4 };
     const defaultCapacity = settings?.defaultSlotCapacity || 4;
 
+    // インデックスエラー回避のため、slotIdで絞り込みメモリ上でステータスフィルタを行う
     const lessonsQuery = adminDb.collection('lessons')
-      .where('status', 'in', ['approved', 'scheduled']);
+        .where('slotId', '>=', monthStr)
+        .where('slotId', '<=', monthStr + '\uf8ff');
       
     const lessonsSnapshot = await lessonsQuery.get();
     
     const lessonsInMonth = lessonsSnapshot.docs
         .map(doc => doc.data())
-        .filter(lesson => lesson.slotId.startsWith(monthStr));
+        .filter(lesson => ['approved', 'scheduled'].includes(lesson.status));
 
     const occupancyMap = new Map<string, number>();
     lessonsInMonth.forEach(lesson => {
