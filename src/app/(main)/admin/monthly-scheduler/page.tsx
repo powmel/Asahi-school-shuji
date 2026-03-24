@@ -89,6 +89,7 @@ function DateBucket({
       onClick={onSelectDate}
       className={cn(
         "cursor-pointer transition-all hover:shadow-md h-full flex flex-col",
+        selectedStudentId && !sourceSlotId ? "ring-2 ring-primary/20 bg-primary/5" : ""
       )}
     >
       <CardHeader className="text-center pb-2">
