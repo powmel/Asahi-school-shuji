@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, UserPlus, Sparkles, Settings, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, UserPlus, Sparkles, Settings as SettingsIcon, Star } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -34,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ActiveDatesDialog } from '@/components/admin/ActiveDatesDialog';
 
 
 const courseMap: { [key in Student['course']]: { name: string; limit: number } } = {
@@ -70,7 +71,6 @@ export function EditSlotDialog({
 
   useEffect(() => {
     if (open && allStudents.length > 0 && slot) {
-      // Use optimized batch count
       getMonthlyLessonCounts(currentMonth).then(setStudentMonthlyCounts);
     }
   }, [open, allStudents, currentMonth, slot]);
@@ -209,9 +209,10 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [isActiveDatesDialogOpen, setIsActiveDatesDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const weekendDays = useMemo(() => {
+  const scheduleDays = useMemo(() => {
     if (!appSettings) return [];
     
     const monthKey = format(currentMonth, 'yyyy-MM');
@@ -219,11 +220,12 @@ export default function SchedulePage() {
 
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
+    
     return eachDayOfInterval({ start, end }).map(day => ({
         day,
         isWeekend: isSaturday(day) || isSunday(day),
         isActive: activeDates.includes(format(day, 'yyyy-MM-dd'))
-    })).filter(d => d.isWeekend);
+    })).filter(d => d.isActive || d.isWeekend); // 開講日または週末を表示
 
   }, [currentMonth, appSettings]);
 
@@ -271,8 +273,8 @@ export default function SchedulePage() {
       <div>
         <PageHeader title="月間スケジューラ">
           <div className="flex items-center gap-2">
-            <Button variant="outline" disabled>
-                <Settings className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={() => setIsActiveDatesDialogOpen(true)}>
+                <SettingsIcon className="mr-2 h-4 w-4" />
                 開講日設定
             </Button>
             <Tooltip>
@@ -287,7 +289,7 @@ export default function SchedulePage() {
                 </TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-4">
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -303,7 +305,7 @@ export default function SchedulePage() {
         
         <div className="overflow-x-auto rounded-lg border bg-card">
           <div className="grid grid-flow-col auto-cols-fr min-w-max">
-            {weekendDays.map(({day, isActive}) => {
+            {scheduleDays.map(({day, isActive}) => {
               const dayString = format(day, 'yyyy-MM-dd');
               const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
               
@@ -368,6 +370,15 @@ export default function SchedulePage() {
             })}
           </div>
         </div>
+
+        <ActiveDatesDialog
+          open={isActiveDatesDialogOpen}
+          onOpenChange={setIsActiveDatesDialogOpen}
+          currentMonth={currentMonth}
+          appSettings={appSettings}
+          onSave={() => fetchData(currentMonth)}
+        />
+
          <EditSlotDialog
           open={!!editingSlot}
           onOpenChange={(isOpen) => {
