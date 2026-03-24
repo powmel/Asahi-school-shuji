@@ -1,7 +1,6 @@
 
 'use client';
 import {
-    getFirestore,
     doc,
     collection,
     getDocs,
@@ -12,14 +11,10 @@ import {
     deleteDoc,
     query,
     where,
-    orderBy,
-    startAt,
-    endAt,
     Timestamp,
     serverTimestamp,
     runTransaction,
     writeBatch,
-    documentId,
 } from 'firebase/firestore';
 import type { Student, TimeSlot, Lesson, SwapRequest, Announcement, LessonWithDetails, AppSettings, SwapRequestWithDetails } from './types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
@@ -45,7 +40,7 @@ export const getDefaultActiveDatesForMonth = (month: Date): string[] => {
     const end = endOfMonth(month);
     const allWeekendDays = eachDayOfInterval({ start, end })
         .filter(day => isSaturday(day) || isSunday(day));
-    return allWeekendDays.slice(0, 6).map(day => format(day, 'yyyy-MM-dd'));
+    return allWeekendDays.map(day => format(day, 'yyyy-MM-dd'));
 }
 
 // --- Helper Functions to get references ---
@@ -82,7 +77,6 @@ export const getStudentDetails = async (studentId: string): Promise<Student | un
 
 export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'createdAt'>>): Promise<string> => {
     const db = getDb();
-    
     try {
         const newStudentId = await runTransaction(db, async (transaction) => {
             const counterRef = doc(db, 'counters', 'studentCounter');
@@ -103,7 +97,6 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
             linkTokenExpiresAt.setDate(linkTokenExpiresAt.getDate() + 7);
 
             const newStudentRef = doc(collection(db, 'students'));
-
             transaction.set(newStudentRef, {
                 ...data,
                 studentCode,
@@ -111,13 +104,11 @@ export const createStudent = async (data: Partial<Omit<Student, 'uid' | 'created
                 linkTokenExpiresAt: Timestamp.fromDate(linkTokenExpiresAt),
                 isActive: data.isActive ?? true,
                 createdAt: serverTimestamp(),
+                preferredSlot: data.preferredSlot || { enabled: false, dow: 'either', slotKey: '10:00' }
             });
-            
             return newStudentRef.id;
         });
-
         return newStudentId;
-
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
@@ -132,18 +123,14 @@ export const updateStudent = async (studentId: string, data: Partial<Student>): 
 export const deleteStudent = async (studentId: string): Promise<void> => {
     const db = getDb();
     const batch = writeBatch(db);
-
     batch.delete(getStudentRef(studentId));
-
     const lessonsQuery = query(collection(db, 'lessons'), where('studentId', '==', studentId));
     const lessonsSnapshot = await getDocs(lessonsQuery);
     lessonsSnapshot.forEach(doc => batch.delete(doc.ref));
-
     const studentDoc = await getStudentDetails(studentId);
     if(studentDoc?.linkedUserId) {
         batch.delete(doc(db, 'users', studentDoc.linkedUserId));
     }
-    
     return await batch.commit();
 };
 
@@ -151,14 +138,10 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
 // --- Lesson and Slot API ---
 export const getStudentUpcomingLessons = async (authUid: string): Promise<LessonWithDetails[]> => {
     const db = getDb();
-    
     const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
-    if (!userDoc.exists() || !userDoc.data().linkedStudentId) {
-        return [];
-    }
+    if (!userDoc.exists() || !userDoc.data().linkedStudentId) return [];
     const studentDocId = userDoc.data().linkedStudentId;
-
 
     const q = query(collection(getDb(), 'lessons'), where('studentId', '==', studentDocId));
     const lessonSnap = await getDocs(q);
@@ -182,10 +165,8 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
     if (!lessonDoc.exists()) return null;
 
     const lessonData = { ...lessonDoc.data(), lessonId: lessonDoc.id } as Lesson;
-    
     const userRef = doc(db, 'users', authUid);
     const userDoc = await getDoc(userRef);
-
     const userData = userDoc.data();
     const isAdmin = userData && userData.role === 'admin';
 
@@ -205,13 +186,8 @@ export const getLessonDetails = async (lessonId: string, authUid: string): Promi
     };
 };
 
-/**
- * 授業回数の一括集計 (N+1問題の解決)
- * インデックスエラーを回避するため、statusフィルタをメモリ上で行う
- */
 export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string, number>> => {
     const monthStr = format(month, 'yyyy-MM');
-    // シンプルなクエリにしてインデックス不要にする
     const q = query(
         collection(getDb(), 'lessons'), 
         where('slotId', '>=', monthStr),
@@ -221,7 +197,6 @@ export const getMonthlyLessonCounts = async (month: Date): Promise<Record<string
     const counts: Record<string, number> = {};
     snapshot.docs.forEach(doc => {
         const data = doc.data();
-        // メモリ上でフィルタリング
         if (['approved', 'scheduled'].includes(data.status)) {
             counts[data.studentId] = (counts[data.studentId] || 0) + 1;
         }
@@ -237,14 +212,12 @@ export const getSlotsForMonth = async (month: Date): Promise<TimeSlot[]> => {
         where('slotId', '<=', monthStr + '\uf8ff')
     );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    // メモリ上でフィルタリング
     const lessonsInMonth = lessonsSnapshot.docs
         .map(d => d.data() as Lesson)
         .filter(l => ['approved', 'scheduled'].includes(l.status));
 
     const slotsMap: Map<string, TimeSlot> = new Map();
     const settings = await getAppSettings();
-
     const activeDates = settings.activeDatesByMonth[monthStr] || getDefaultActiveDatesForMonth(month);
 
     for (const date of activeDates) {
@@ -278,7 +251,6 @@ export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
         where('slotId', '<=', date + '\uf8ff')
     );
     const lessonsSnapshot = await getDocs(lessonsQuery);
-    // メモリ上でフィルタリング
     const lessonsOnDay = lessonsSnapshot.docs
         .map(d => d.data() as Lesson)
         .filter(l => ['approved', 'scheduled'].includes(l.status));
@@ -310,37 +282,23 @@ export const getSlotsForDay = async (date: string): Promise<TimeSlot[]> => {
 
 export const updateSlotAssignments = async (slotId: string, studentIds: string[]): Promise<void> => {
     const db = getDb();
-    
     await runTransaction(db, async (transaction) => {
         const lessonsQuery = query(collection(db, 'lessons'), where('slotId', '==', slotId));
         const currentLessonsSnap = await getDocs(lessonsQuery);
-        
-        // フィルタリング
         const filteredDocs = currentLessonsSnap.docs.filter(d => ['approved', 'scheduled'].includes(d.data().status));
-        
         const currentStudentIds = new Set(filteredDocs.map(doc => doc.data().studentId));
         const newStudentIds = new Set(studentIds);
 
-        // Students to remove
         for (const doc of filteredDocs) {
-            const studentId = doc.data().studentId;
-            if (!newStudentIds.has(studentId)) {
-                transaction.delete(doc.ref);
-            }
+            if (!newStudentIds.has(doc.data().studentId)) transaction.delete(doc.ref);
         }
 
-        // Students to add
         for (const studentId of newStudentIds) {
             if (!currentStudentIds.has(studentId)) {
                 const newLessonRef = doc(collection(db, 'lessons'));
                 transaction.set(newLessonRef, {
-                    studentId,
-                    slotId,
-                    status: 'approved',
-                    priority: 'normal',
-                    updatedAt: serverTimestamp(),
-                    createdBy: 'teacher',
-                    source: 'manual',
+                    studentId, slotId, status: 'approved', priority: 'normal',
+                    updatedAt: serverTimestamp(), createdBy: 'teacher', source: 'manual',
                 });
             }
         }
@@ -349,47 +307,22 @@ export const updateSlotAssignments = async (slotId: string, studentIds: string[]
 
 export const moveStudentBetweenSlots = async (studentId: string, fromSlotId: string, toSlotId: string): Promise<void> => {
     const db = getDb();
-    
     await runTransaction(db, async (transaction) => {
-        // Find the lesson to move
-        const q = query(
-            collection(db, 'lessons'), 
-            where('studentId', '==', studentId), 
-            where('slotId', '==', fromSlotId)
-        );
+        const q = query(collection(db, 'lessons'), where('studentId', '==', studentId), where('slotId', '==', fromSlotId));
         const snapshot = await getDocs(q);
-        
-        // メモリ上でステータス確認
         const lessonDoc = snapshot.docs.find(d => ['approved', 'scheduled'].includes(d.data().status));
         
         if (lessonDoc) {
-            // Delete old
             transaction.delete(lessonDoc.ref);
-            
-            // Create new
             const newLessonRef = doc(collection(db, 'lessons'));
             transaction.set(newLessonRef, {
-                studentId,
-                slotId: toSlotId,
-                status: 'approved',
-                priority: 'normal',
-                updatedAt: serverTimestamp(),
-                createdBy: 'teacher',
-                source: 'manual',
+                studentId, slotId: toSlotId, status: 'approved', priority: 'normal',
+                updatedAt: serverTimestamp(), createdBy: 'teacher', source: 'manual',
             });
         } else {
             throw new Error("元の予約が見つかりませんでした。");
         }
     });
-};
-
-// --- Announcement API ---
-export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
-    const q = query(collection(getDb(), 'announcements'), where('published', '==', true));
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-        .map(doc => ({ ...doc.data(), id: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as Announcement))
-        .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 export const getAllAnnouncements = async (): Promise<Announcement[]> => {
@@ -408,41 +341,20 @@ export const saveAnnouncement = async (announcement: Partial<Announcement>): Pro
     }
 };
 
-// --- Swap Request API ---
-export const createSwapRequest = async (request: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<void> => {
-    const db = getDb();
-    const batch = writeBatch(db);
-
-    const newRequestRef = doc(collection(db, 'swapRequests'));
-    batch.set(newRequestRef, { ...request, status: 'pending', createdAt: serverTimestamp() });
-    
-    const lessonRef = getLessonRef(request.fromLessonId);
-    batch.update(lessonRef, { status: 'swap_pending' });
-
-    await batch.commit();
-};
-
-/**
- * 振替申請の一括取得 (N+1問題の解決)
- */
 export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> => {
     const db = getDb();
     const snapshot = await getDocs(collection(db, 'swapRequests'));
     const requests = snapshot.docs.map(doc => ({ ...doc.data(), requestId: doc.id, createdAt: (doc.data().createdAt as Timestamp).toDate() } as SwapRequest));
-    
     if (requests.length === 0) return [];
 
-    // 一括取得で高速化
     const students = await getAllStudents();
     const studentsMap = new Map(students.map(s => [s.uid, s]));
-
     const lessonsSnap = await getDocs(collection(db, 'lessons'));
     const lessonsMap = new Map(lessonsSnap.docs.map(d => [d.id, { ...d.data(), lessonId: d.id } as Lesson]));
 
     return requests.map(req => {
         const student = studentsMap.get(req.studentId);
         const lesson = lessonsMap.get(req.fromLessonId);
-        
         if (!student || !lesson) return null;
 
         const lessonWithDetails: LessonWithDetails = {
@@ -452,12 +364,7 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
             slotStartTime: lesson.slotId.substring(11),
             slotEndTime: fixedTimeSlotsDefinition.find(fts => fts.startTime === lesson.slotId.substring(11))?.endTime || '',
         };
-
-        return {
-            ...req,
-            studentName: student.name,
-            fromLesson: lessonWithDetails,
-        };
+        return { ...req, studentName: student.name, fromLesson: lessonWithDetails };
     }).filter((r): r is SwapRequestWithDetails => r !== null);
 };
 
@@ -465,85 +372,22 @@ export const updateSwapRequestStatus = async (requestId: string, status: 'approv
     const db = getDb();
     const batch = writeBatch(db);
     const reqRef = getSwapRequestRef(requestId);
-
     batch.update(reqRef, { status });
-
     const requestSnap = await getDoc(reqRef);
     if(!requestSnap.exists()) throw new Error("Swap request not found");
     const request = requestSnap.data() as SwapRequest;
-
-    if(status === 'approved') {
-        batch.update(getLessonRef(request.fromLessonId), { status: 'swapped' });
-    } else if (status === 'rejected') {
-        batch.update(getLessonRef(request.fromLessonId), { status: 'scheduled' });
-    }
-
+    if(status === 'approved') batch.update(getLessonRef(request.fromLessonId), { status: 'swapped' });
+    else if (status === 'rejected') batch.update(getLessonRef(request.fromLessonId), { status: 'scheduled' });
     await batch.commit();
 };
 
-
-// --- App Settings ---
 export const getAppSettings = async (): Promise<AppSettings> => {
     const docRef = doc(getDb(), 'settings', 'app');
     const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        return docSnap.data() as AppSettings;
-    }
-    return {
-        defaultSlotCapacity: 4,
-        activeDatesByMonth: {},
-    };
+    return docSnap.exists() ? (docSnap.data() as AppSettings) : { defaultSlotCapacity: 4, activeDatesByMonth: {} };
 };
 
 export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     const docRef = doc(getDb(), 'settings', 'app');
     await setDoc(docRef, newSettings, { merge: true });
-};
-
-// --- Lesson Move API (Student Self-Service) ---
-
-export const moveLessonToSlotWithToken = async (
-    lessonId: string,
-    targetSlotId: string,
-    idToken: string
-): Promise<void> => {
-    const response = await fetch('/api/move-lesson', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ lessonId, targetSlotId }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || 'レッスンの移動に失敗しました。');
-    }
-};
-
-export const getAvailableSlotsForMove = async (
-    excludeSlotId: string,
-    month: Date,
-    idToken: string
-): Promise<Array<TimeSlot & { availableSeats: number }>> => {
-    const monthStr = format(month, 'yyyy-MM');
-    
-    const response = await fetch('/api/available-slots', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ excludeSlotId, month: monthStr }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || '空きスロットの取得に失敗しました。');
-    }
-
-    return data;
 };
