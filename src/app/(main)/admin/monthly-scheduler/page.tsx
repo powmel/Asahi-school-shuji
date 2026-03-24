@@ -322,9 +322,9 @@ export default function MonthlySchedulerPage() {
         return;
       }
 
-      // 「移動」の場合は上限チェックをスキップ
-      const effectiveSourceSlotId = sourceSlotId || allSlots.find(s => s.assignedStudentIds.includes(studentId))?.slotId || null;
-      const isMove = effectiveSourceSlotId !== null;
+      // 修正: sourceSlotIdが明示的に設定されている場合のみ「移動」とみなす。
+      // プールから選んだ場合は sourceSlotId が null なので、常に「追加」になる。
+      const isMove = sourceSlotId !== null;
 
       if (!isMove) {
           const { limit } = courseMap[student.course];
@@ -361,9 +361,8 @@ export default function MonthlySchedulerPage() {
         return;
     }
 
-    // すでに別のスロットにいる場合は移動扱いにする
-    const effectiveSourceSlotId = sourceSlotId || allSlots.find(s => s.assignedStudentIds.includes(studentId))?.slotId || null;
-    const isMove = effectiveSourceSlotId !== null;
+    // 修正: sourceSlotIdが明示的に設定されている場合のみ「移動」とみなす。
+    const isMove = sourceSlotId !== null;
 
     if (!isMove) {
         const { limit } = courseMap[student.course];
@@ -379,7 +378,7 @@ export default function MonthlySchedulerPage() {
 
     try {
         if (isMove) {
-            await moveStudentBetweenSlots(studentId, effectiveSourceSlotId!, slotId);
+            await moveStudentBetweenSlots(studentId, sourceSlotId!, slotId);
             toast({ title: "成功", description: `レッスンを移動しました。` });
         } else {
             const newStudentIds = Array.from(new Set([...targetSlot.assignedStudentIds, studentId]));
