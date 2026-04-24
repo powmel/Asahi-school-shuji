@@ -35,3 +35,13 @@ next-env.d.ts
 
 # firebase secrets (DO NOT COMMIT)
 FIREBASE_SERVICE_ACCOUNT_KEY.json
+
+# extra env safety
+.env
+.env.*
+!.env.example
+
+# extra firebase secret safety
+*serviceAccount*.json
+*service-account*.json
+*adminsdk*.json
