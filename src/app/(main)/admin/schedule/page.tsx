@@ -17,8 +17,8 @@ import {
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, getMonthlyLessonCounts, getAppSettings, AppSettings, getDefaultActiveDatesForMonth } from '@/lib/data';
-import type { TimeSlot, Student } from '@/lib/types';
+import { getSlotsForMonth, getAllStudents, updateSlotAssignments, fixedTimeSlotsDefinition, getMonthlyLessonCounts, getAppSettings, getDefaultActiveDatesForMonth } from '@/lib/data';
+import type { TimeSlot, Student, AppSettings } from '@/lib/types';
 import { Loading } from '@/components/shared/Loading';
 import {
   Dialog,
@@ -272,7 +272,7 @@ export default function SchedulePage() {
     <TooltipProvider>
       <div>
         <PageHeader title="月間スケジューラ">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => setIsActiveDatesDialogOpen(true)}>
                 <SettingsIcon className="mr-2 h-4 w-4" />
                 開講日設定
@@ -289,7 +289,7 @@ export default function SchedulePage() {
                 </TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-2 ml-4">
+            <div className="flex items-center gap-2 sm:ml-4">
               <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -303,7 +303,78 @@ export default function SchedulePage() {
           </div>
         </PageHeader>
         
-        <div className="overflow-x-auto rounded-lg border bg-card">
+        <div className="mb-4 grid gap-3 md:hidden">
+          {scheduleDays.map(({day, isActive}) => {
+            const dayString = format(day, 'yyyy-MM-dd');
+            const daySlots = isActive ? slots.filter(s => s.date === dayString) : [];
+            const totalOccupancy = daySlots.reduce((sum, slot) => sum + slot.assignedStudentIds.length, 0);
+            const totalCapacity = daySlots.reduce((sum, slot) => sum + slot.capacity, 0);
+
+            return (
+              <Card key={dayString} className={cn("border-border", !isActive && "bg-muted/30")}>
+                <div className="flex items-center justify-between border-b border-border p-4">
+                  <div>
+                    <p className={cn("font-headline text-lg font-semibold", isSunday(day) && "text-destructive")}>
+                      {format(day, 'M月d日 (E)', { locale: ja })}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isActive ? `${totalOccupancy} / ${totalCapacity || 0} 名` : '休講日'}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/day/${dayString}`}>詳細</Link>
+                    </Button>
+                  )}
+                </div>
+                {isActive ? (
+                  <div className="divide-y divide-border">
+                    {fixedTimeSlotsDefinition.map(timeDef => {
+                      const slot = daySlots.find(s => s.startTime === timeDef.startTime);
+                      const mockSlot: TimeSlot = slot || {
+                        slotId: `${dayString}-${timeDef.startTime}`,
+                        date: dayString,
+                        startTime: timeDef.startTime,
+                        endTime: timeDef.endTime,
+                        capacity: 4,
+                        assignedStudentIds: [],
+                      };
+                      const occupancy = mockSlot.assignedStudentIds.length;
+                      const isFull = occupancy >= mockSlot.capacity;
+
+                      return (
+                        <button
+                          key={mockSlot.slotId}
+                          type="button"
+                          onClick={() => handleSlotClick(mockSlot)}
+                          className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">{mockSlot.startTime} - {mockSlot.endTime}</p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {mockSlot.assignedStudentIds
+                                .map(studentId => allStudents.find(s => s.uid === studentId)?.name || '不明')
+                                .join('、') || '未割り振り'}
+                            </p>
+                          </div>
+                          <Badge variant={isFull ? "destructive" : "outline"} className="shrink-0">
+                            {occupancy}/{mockSlot.capacity}
+                          </Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    この日はスケジュール対象外です。
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
           <div className="grid grid-flow-col auto-cols-fr min-w-max">
             {scheduleDays.map(({day, isActive}) => {
               const dayString = format(day, 'yyyy-MM-dd');

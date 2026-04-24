@@ -44,7 +44,7 @@ function StudentCard({ student, selected, onSelect }: { student: StudentWithUsag
     <div
       onClick={onSelect}
       className={cn(
-        "p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all w-full h-16 flex-shrink-0 relative",
+        "p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all w-full min-h-16 flex-shrink-0 relative",
         selected ? "border-primary ring-2 ring-primary bg-primary/10" : "bg-card hover:bg-muted/50",
         isOverLimit ? "border-yellow-500 bg-yellow-500/10" : ""
       )}
@@ -88,7 +88,7 @@ function DateBucket({
     <Card
       onClick={onSelectDate}
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md h-full flex flex-col",
+        "cursor-pointer transition-all hover:shadow-md min-h-40 h-full flex flex-col",
         selectedStudentId && !sourceSlotId ? "ring-2 ring-primary/20 bg-primary/5" : ""
       )}
     >
@@ -444,11 +444,17 @@ export default function MonthlySchedulerPage() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 grid md:grid-cols-3 gap-4 overflow-hidden">
+      {selectedStudentId && (
+        <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">
+          生徒を選択中です。追加したい日付をタップすると、空き枠へ割り振ります。
+        </div>
+      )}
+
+      <div className="flex-1 grid gap-6 overflow-visible md:grid-cols-3 md:gap-4 md:overflow-hidden">
         <div className="flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">生徒プール</h3>
-            <ScrollArea className="flex-1 pr-2">
-                <div className="grid grid-cols-2 gap-2">
+            <ScrollArea className="max-h-72 pr-2 md:max-h-none md:flex-1">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-2">
                     {studentsWithUsage.map(student => (
                     <StudentCard
                         key={student.uid}
@@ -463,8 +469,8 @@ export default function MonthlySchedulerPage() {
 
         <div className="md:col-span-2 flex flex-col min-h-0">
             <h3 className="font-headline text-lg mb-2 px-1">日付バケツ</h3>
-            <ScrollArea className='flex-1' hideScrollbar>
-                <div className="grid md:grid-cols-2 gap-4 pb-4">
+            <ScrollArea className='md:flex-1' hideScrollbar>
+                <div className="grid gap-3 pb-4 sm:grid-cols-2 md:gap-4">
                     {activeDates.map(date => {
                         const dateSlots = allSlots.filter(s => s.date === date);
                         const studentIdsOnDate = new Set(dateSlots.flatMap(s => s.assignedStudentIds));
@@ -489,7 +495,7 @@ export default function MonthlySchedulerPage() {
       </div>
       
       <Dialog open={isSlotPanelOpen} onOpenChange={setIsSlotPanelOpen}>
-        <DialogContent className="max-w-md bg-background">
+        <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto bg-background">
             <DialogHeader>
                 <DialogTitle>時間スロット割り当て</DialogTitle>
                 <DialogDescription>
