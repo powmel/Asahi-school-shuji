@@ -8,7 +8,7 @@ Phase 1 was implemented with a minimal change to `src/app/(main)/admin/layout.ts
 
 Phase 2 was started, but stopped before implementation because `next.config.ts` currently exposes `FIREBASE_SERVICE_ACCOUNT_KEY` through the Next.js `env` config. That is a secret exposure risk and should be fixed before continuing Vercel deployment preparation.
 
-Phase 3 was not started.
+Phase 3 was not started. The rescued design-system document has since been promoted from `docs/DESIGN.md` to root `DESIGN.md`, which is the canonical location for future design work.
 
 ## 2. Completed Phases
 
@@ -31,22 +31,17 @@ Not completed:
   - Allows rendering only when `users/{uid}.role === "admin"`.
   - Redirects non-admin users, including students, to `/student`.
 
+- `DESIGN.md`
+  - Promoted the rescued design-system document from `docs/DESIGN.md` to the project root.
+  - This file is the canonical design-system document for future work.
+
 - `AI_WORK_REPORT.md`
   - Added this handoff report for the next AI agent.
-
-Existing uncommitted file from earlier work:
-
-- `docs/DESIGN.md`
-  - Design-system document saved under `docs`.
-  - It is currently untracked and was not included in the Phase 1 commit.
 
 ## 4. Commits
 
 - `067207f` - `Protect admin routes with role check`
-
-This report should be committed separately with:
-
-- `Add AI work report for handoff`
+- `4133577` - `Add AI work report for handoff`
 
 ## 5. Verification Results
 
@@ -144,7 +139,7 @@ Then check:
 - Firebase Admin SDK behavior on Vercel Node.js runtime still needs production or preview verification.
 - `npm run typecheck` currently fails due to existing repository errors.
 - `npm run build` currently fails on Windows because of POSIX-style `NODE_ENV=production` syntax.
-- `docs/DESIGN.md` is currently untracked unless a later commit adds it.
+- `DESIGN.md` is now the canonical design-system document at the project root.
 
 ## 8. Next Recommended Tasks
 
@@ -166,7 +161,7 @@ You are continuing work on `S:\Asahi-school-shuji`, a Next.js 15 App Router + Fi
 Read these first:
 
 - `docs/HANDOVER.md`
-- `docs/DESIGN.md`
+- `DESIGN.md`
 - `AI_WORK_REPORT.md`
 
 Completed:
@@ -185,7 +180,7 @@ Current state:
 - This is a secret exposure risk in Next.js and should be removed before continuing Vercel deployment work.
 - Do not commit secret values.
 - Environment variable names are allowed; values are not.
-- `docs/DESIGN.md` exists but is currently untracked.
+- `DESIGN.md` exists at the project root and should be used as the canonical design-system source.
 
 Verification:
 
@@ -204,4 +199,3 @@ Continue Phase 2 after addressing the secret exposure risk:
 6. Do not change API routes' Admin SDK verification logic unless explicitly requested.
 7. Run `npm run typecheck` and `npm run build`; document failures if existing errors remain.
 8. Commit small changes by phase.
-
