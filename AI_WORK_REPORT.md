@@ -176,6 +176,29 @@ After deploying to Vercel Preview or running locally from a normal filesystem pa
 11. Confirm student lesson move dialog can load available slots through `/api/available-slots`.
 12. Confirm moving a lesson calls `/api/move-lesson` with a Firebase ID token.
 
+## 7.1 Vercel Preview Checklist
+
+Before opening the Preview URL:
+
+- Confirm all variables from `.env.example` are set in Vercel Project Settings.
+- Confirm `FIREBASE_SERVICE_ACCOUNT_KEY` is set only as a server-side Vercel environment variable.
+- Confirm no `.env`, `.env.local`, service-account JSON file, or private key has been committed.
+- Confirm Vercel uses the default Next.js framework preset.
+- Confirm Firebase Admin SDK routes are not configured for Edge runtime.
+
+After the Preview build:
+
+- Confirm the Vercel build log reaches `next build` and does not reproduce the local `EISDIR readlink` error.
+- If the build fails, inspect the first Vercel build-log error before changing code.
+- Open `/login` and confirm the login screen renders.
+- Open `/` and confirm it redirects by Firebase Auth state and Firestore role/link status.
+- Open `/admin` while signed out and confirm redirect to `/login`.
+- Open `/admin` as a student and confirm redirect to `/student`.
+- Open `/admin` as an admin and confirm the dashboard renders.
+- Open `/student` as a linked student and confirm the student dashboard renders.
+- Test a student lesson move flow so `/api/available-slots` and `/api/move-lesson` run with Firebase Admin SDK.
+- Check Vercel function logs for Firebase Admin SDK initialization or service-account JSON parse errors.
+
 ## 8. Remaining Risks
 
 - Local `npm run build` still fails on the current `S:` workspace because of Node/webpack `readlink` behavior on normal files.
@@ -225,4 +248,3 @@ Important constraints:
 Recommended next task:
 
 Push to GitHub, configure Vercel env vars, run a Preview deployment, and verify whether `next build` passes in Vercel's Linux environment. If it passes there, treat the remaining local build failure as a workspace filesystem issue. If it fails there too, investigate the first Vercel build log error.
-
