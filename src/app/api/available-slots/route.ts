@@ -6,7 +6,10 @@ import { format } from 'date-fns';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  if (!adminDb || !adminAuth) {
+  const db = adminDb;
+  const auth = adminAuth;
+
+  if (!db || !auth) {
     return NextResponse.json({ error: 'Firebase Admin SDK not initialized' }, { status: 500 });
   }
 
@@ -23,13 +26,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
 
-    const userRef = adminDb.collection('users').doc(uid);
+    const userRef = db.collection('users').doc(uid);
     const userDoc = await userRef.get();
     
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return NextResponse.json({ error: 'ユーザーが見つかりません。' }, { status: 401 });
     }
 
@@ -40,13 +43,13 @@ export async function POST(request: Request) {
 
     const monthStr = format(monthDate, 'yyyy-MM');
 
-    const settingsDocRef = adminDb.collection('settings').doc('app');
+    const settingsDocRef = db.collection('settings').doc('app');
     const settingsDoc = await settingsDocRef.get();
     const settings = settingsDoc.exists ? settingsDoc.data() : { defaultSlotCapacity: 4 };
     const defaultCapacity = settings?.defaultSlotCapacity || 4;
 
     // インデックスエラー回避のため、slotIdで絞り込みメモリ上でステータスフィルタを行う
-    const lessonsQuery = adminDb.collection('lessons')
+    const lessonsQuery = db.collection('lessons')
         .where('slotId', '>=', monthStr)
         .where('slotId', '<=', monthStr + '\uf8ff');
       

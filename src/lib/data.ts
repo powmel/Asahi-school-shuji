@@ -332,6 +332,11 @@ export const getAllAnnouncements = async (): Promise<Announcement[]> => {
         .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
+export const getPublishedAnnouncements = async (): Promise<Announcement[]> => {
+    const announcements = await getAllAnnouncements();
+    return announcements.filter(announcement => announcement.published !== false);
+};
+
 export const saveAnnouncement = async (announcement: Partial<Announcement>): Promise<void> => {
     if (announcement.id) {
         const { id, ...data } = announcement;
@@ -368,6 +373,31 @@ export const getAllSwapRequests = async (): Promise<SwapRequestWithDetails[]> =>
     }).filter((r): r is SwapRequestWithDetails => r !== null);
 };
 
+export const createSwapRequest = async (data: Omit<SwapRequest, 'requestId' | 'createdAt' | 'status'>): Promise<string> => {
+    const db = getDb();
+    const userDoc = await getDoc(doc(db, 'users', data.studentId));
+    const studentId = userDoc.exists() && userDoc.data().linkedStudentId
+        ? userDoc.data().linkedStudentId
+        : data.studentId;
+
+    const requestRef = doc(collection(db, 'swapRequests'));
+    const batch = writeBatch(db);
+
+    batch.set(requestRef, {
+        ...data,
+        studentId,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+    });
+    batch.update(getLessonRef(data.fromLessonId), {
+        status: 'swap_pending',
+        updatedAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+    return requestRef.id;
+};
+
 export const updateSwapRequestStatus = async (requestId: string, status: 'approved' | 'rejected'): Promise<void> => {
     const db = getDb();
     const batch = writeBatch(db);
@@ -390,4 +420,49 @@ export const getAppSettings = async (): Promise<AppSettings> => {
 export const updateAppSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     const docRef = doc(getDb(), 'settings', 'app');
     await setDoc(docRef, newSettings, { merge: true });
+};
+
+export const getAvailableSlotsForMove = async (
+    excludeSlotId: string,
+    month: Date,
+    idToken: string
+): Promise<Array<TimeSlot & { availableSeats: number }>> => {
+    const response = await fetch('/api/available-slots', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+            excludeSlotId,
+            month: format(month, 'yyyy-MM'),
+        }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+        throw new Error(payload.error || 'Failed to load available slots.');
+    }
+
+    return payload;
+};
+
+export const moveLessonToSlotWithToken = async (
+    lessonId: string,
+    targetSlotId: string,
+    idToken: string
+): Promise<void> => {
+    const response = await fetch('/api/move-lesson', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ lessonId, targetSlotId }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+        throw new Error(payload.error || 'Failed to move lesson.');
+    }
 };

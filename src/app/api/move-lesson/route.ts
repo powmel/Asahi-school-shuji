@@ -5,7 +5,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  if (!adminDb || !adminAuth) {
+  const db = adminDb;
+  const auth = adminAuth;
+
+  if (!db || !auth) {
     return NextResponse.json({ error: 'Firebase Admin SDK not initialized' }, { status: 500 });
   }
 
@@ -22,14 +25,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
 
-    await adminDb.runTransaction(async (transaction) => {
-      const userRef = adminDb.collection('users').doc(uid);
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(uid);
       const userDoc = await transaction.get(userRef);
       
-      if (!userDoc.exists()) {
+      if (!userDoc.exists) {
         throw new Error('ユーザーが見つかりません。');
       }
       
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
         throw new Error('ユーザーが生徒に連携されていません。');
       }
 
-      const lessonRef = adminDb.collection('lessons').doc(lessonId);
+      const lessonRef = db.collection('lessons').doc(lessonId);
       const lessonDoc = await transaction.get(lessonRef);
       
       if (!lessonDoc.exists) {
